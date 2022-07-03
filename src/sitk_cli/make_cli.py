@@ -1,6 +1,5 @@
-from inspect import Parameter, signature
+from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Any, Callable, Optional
 
 import SimpleITK as sitk
 import typer
@@ -36,14 +35,14 @@ def make_cli(func):
         params.append(_translate_param(p))
 
     return_type = func_sig.return_annotation
-    if return_type and issubclass(return_type, sitk.Image):
+    if return_type and isclass(return_type) and issubclass(return_type, sitk.Image):
         params.insert(
             last_image_argument_idx,
             Parameter(
-                "output_file",
+                "output",
                 kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=typer.Option(...),
-                annotation=Optional[Path],
+                default=None,
+                annotation=Path,
             ),
         )
         return_type = None
@@ -51,27 +50,27 @@ def make_cli(func):
     new_sig = func_sig.replace(parameters=params, return_annotation=return_type)
 
     @wraps(func, new_sig=new_sig)
-    def func_wrapper(*args: Any, **kwargs: Any) -> Callable[[Any], Any]:
+    def func_wrapper(*args, **kwargs):
         output_file: Path = None
         kwargs_inner = {}
         for k, v in kwargs.items():
-            if k == "output_file":
+            if k == "output":
                 output_file = v
                 continue
             if k in image_args and issubclass(type(v), Path):
                 v = sitk.ReadImage(f"{v}")
             kwargs_inner[k] = v
 
-        output = func(*args, **kwargs_inner)
-        if output_file and output:
-            return sitk.WriteImage(output, f"{output_file}")
-        print(output)
-        return output
+        ret = func(*args, **kwargs_inner)
+        if output_file and ret:
+            return sitk.WriteImage(ret, f"{output_file}")
+        print(ret)
+        return ret
 
     return func_wrapper
 
 
-def register_command(app: typer.Typer, func, func_name: str = None):
+def register_command(func, *, app: typer.Typer, func_name: str = None):
     """Register function as command"""
     func_cli = make_cli(func)
 
