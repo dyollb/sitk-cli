@@ -1,6 +1,5 @@
-from inspect import Parameter, signature
+from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Any, Callable
 
 import SimpleITK as sitk
 import typer
@@ -36,7 +35,7 @@ def make_cli(func):
         params.append(_translate_param(p))
 
     return_type = func_sig.return_annotation
-    if return_type and issubclass(return_type, sitk.Image):
+    if return_type and isclass(return_type) and issubclass(return_type, sitk.Image):
         params.insert(
             last_image_argument_idx,
             Parameter(
@@ -51,7 +50,7 @@ def make_cli(func):
     new_sig = func_sig.replace(parameters=params, return_annotation=return_type)
 
     @wraps(func, new_sig=new_sig)
-    def func_wrapper(*args: Any, **kwargs: Any) -> Callable[[Any], Any]:
+    def func_wrapper(*args, **kwargs):
         output_file: Path = None
         kwargs_inner = {}
         for k, v in kwargs.items():

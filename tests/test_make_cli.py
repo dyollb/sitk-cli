@@ -1,12 +1,13 @@
 from inspect import signature
 from pathlib import Path
+from typing import Tuple
 
 import SimpleITK as sitk
 
 import sitk_cli
 
 
-def get_shape(input: sitk.Image) -> int:
+def get_shape(input: sitk.Image) -> Tuple[int, int]:
     return input.GetWidth(), input.GetHeight()
 
 

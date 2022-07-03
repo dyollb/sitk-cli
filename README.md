@@ -1,5 +1,7 @@
 # Wrap SimpleITK functions as command lines
 
+[![Build Actions Status](https://github.com/dyollb/segmantic/workflows/CI/badge.svg)](https://github.com/dyollb/sitk-cli/actions)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://https://opensource.org/licenses/MIT)
 Create simple command line interface from functions that use SimpleITK images as arguments or return type.
 
 Example:
