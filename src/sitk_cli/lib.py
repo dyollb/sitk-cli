@@ -70,7 +70,7 @@ def make_cli(func):
     return func_wrapper
 
 
-def register_command(func, *, app: typer.Typer, func_name: str = None):
+def register_command(func, app: typer.Typer, func_name: str = None):
     """Register function as command"""
     func_cli = make_cli(func)
 
