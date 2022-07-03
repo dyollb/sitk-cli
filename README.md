@@ -2,6 +2,7 @@
 
 [![Build Actions Status](https://github.com/dyollb/segmantic/workflows/CI/badge.svg)](https://github.com/dyollb/sitk-cli/actions)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://https://opensource.org/licenses/MIT)
+
 Create simple command line interface from functions that use SimpleITK images as arguments or return type.
 
 Example:
@@ -25,4 +26,10 @@ if __name__ == "__main__":
     register_command(fill_holes_slice_by_slice, app)
 
     app()
+```
+
+Install from PyPI:
+
+```shell
+pip install sitk-cli
 ```
