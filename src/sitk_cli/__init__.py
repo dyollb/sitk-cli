@@ -1,3 +1,3 @@
-from .make_cli import register_command, make_cli
+from .lib import make_cli, register_command
 
 __all__ = ("register_command", "make_cli")
