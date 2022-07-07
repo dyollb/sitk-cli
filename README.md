@@ -6,6 +6,12 @@
 
 Create simple command line interface from functions that use SimpleITK images as arguments or return type.
 
+Install from PyPI:
+
+```sh
+pip install sitk-cli
+```
+
 Example:
 
 ```Python
@@ -28,10 +34,5 @@ if __name__ == "__main__":
     typer.run(make_cli(fill_holes_slice_by_slice))
 ```
 
+
 ![](./docs/demo.gif)
-
-Install from PyPI:
-
-```shell
-pip install sitk-cli
-```

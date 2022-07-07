@@ -19,7 +19,6 @@ def bias_correct(
 
     Note:
     - if no mask is provided it will be generated using Otsu-thresholding
-    - if no output path is provided the input will be overwritten
     """
     if not isinstance(mask, sitk.Image):
         mask = sitk.OtsuThreshold(input, 0, 1, 200)
