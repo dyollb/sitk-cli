@@ -64,7 +64,6 @@ def make_cli(func):
         ret = func(*args, **kwargs_inner)
         if output_file and ret:
             return sitk.WriteImage(ret, f"{output_file}")
-        print(ret)
         return ret
 
     return func_wrapper
