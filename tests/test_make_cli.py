@@ -15,6 +15,13 @@ def make_image(width: int, height: int) -> sitk.Image:
     return sitk.Image(width, height, sitk.sitkInt16)
 
 
+def register_api(
+    fixed: sitk.Image, moving: sitk.Image, init_transform: sitk.Transform
+) -> sitk.Transform:
+    tx = sitk.CenteredTransformInitializer(fixed, moving)
+    return sitk.CompositeTransform([init_transform, tx])
+
+
 def test_make_cli_image_arg():
     cli = sitk_cli.make_cli(get_shape)
     sig = signature(cli)
@@ -44,3 +51,14 @@ def test_make_cli_usage(tmp_path: Path):
 
     # check running without writing output file
     make_image_cli(width=32, height=64, output=None)
+
+
+def test_make_cli_transform_arg():
+    cli = sitk_cli.make_cli(register_api, output_arg_name="output_transform")
+    sig = signature(cli)
+
+    assert len(sig.parameters) == 4
+    assert issubclass(sig.parameters["fixed"].annotation, Path)
+    assert issubclass(sig.parameters["moving"].annotation, Path)
+    assert issubclass(sig.parameters["init_transform"].annotation, Path)
+    assert issubclass(sig.parameters["output_transform"].annotation, Path)

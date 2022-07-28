@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/sitk-cli.svg)](https://badge.fury.io/py/sitk-cli)
 
-Create simple command line interface from functions that use SimpleITK images as arguments or return type.
+Create simple command line interface from functions that use SimpleITK images (and transforms) as arguments or return type.
 
 Install from PyPI:
 
@@ -33,6 +33,5 @@ def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
 if __name__ == "__main__":
     typer.run(make_cli(fill_holes_slice_by_slice))
 ```
-
 
 ![](./docs/demo.gif)
