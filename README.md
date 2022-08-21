@@ -4,15 +4,10 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/sitk-cli.svg)](https://badge.fury.io/py/sitk-cli)
 
-Create simple command line interface from functions that use SimpleITK images (and transforms) as arguments or return type.
+## Overview
 
-Install from PyPI:
+Create simple command line interface from functions that use [SimpleITK](https://github.com/SimpleITK/SimpleITK) images (and transforms) as arguments or return type.
 
-```sh
-pip install sitk-cli
-```
-
-Example:
 
 ```Python
 import SimpleITK as sitk
@@ -34,4 +29,11 @@ if __name__ == "__main__":
     typer.run(make_cli(fill_holes_slice_by_slice))
 ```
 
+## Installation
+
+```sh
+pip install sitk-cli
+```
+
+## Demo
 ![](./docs/demo.gif)
