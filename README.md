@@ -13,7 +13,7 @@ Create simple command line interface from functions that use [SimpleITK](https:/
 import SimpleITK as sitk
 import typer
 
-from sitk-cli import make_cli
+from sitk_cli import make_cli
 
 
 def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
