@@ -1,16 +1,24 @@
+from typing import Optional
+
 import SimpleITK as sitk
 import typer
 
 from sitk_cli import register_command
 
+app = typer.Typer()
 
+
+@register_command(app)
 def median_filter(input: sitk.Image, radius: int) -> sitk.Image:
-    return sitk.Median(input, [radius] * input.GetDimension())
+    """Perform median filtering"""
+    image: sitk.Image = sitk.Median(input, [radius] * input.GetDimension())
+    return image
 
 
+@register_command(app)
 def bias_correct(
     input: sitk.Image,
-    mask: sitk.Image = None,
+    mask: Optional[sitk.Image] = None,
     shrink_factor: int = 4,
     num_fitting_levels: int = 4,
     num_iterations: int = 50,
@@ -34,14 +42,9 @@ def bias_correct(
 
     corrector.Execute(image, mask)
     log_bias_field = corrector.GetLogBiasFieldAsImage(input)
-    corrected_image_full_resolution = input / sitk.Exp(log_bias_field)
+    corrected_image_full_resolution: sitk.Image = input / sitk.Exp(log_bias_field)
     return corrected_image_full_resolution
 
 
 if __name__ == "__main__":
-    app = typer.Typer()
-
-    register_command(median_filter, app)
-    register_command(bias_correct, app)
-
     app()
