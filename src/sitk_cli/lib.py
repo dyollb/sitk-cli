@@ -1,5 +1,6 @@
 from inspect import Parameter, isclass, signature
 from pathlib import Path
+from typing import Optional
 
 import SimpleITK as sitk
 import typer
@@ -57,7 +58,7 @@ def make_cli(func, output_arg_name="output"):
 
     @wraps(func, new_sig=new_sig)
     def func_wrapper(*args, **kwargs):
-        output_file: Path = None
+        output_file: Optional[Path] = None
         kwargs_inner = {}
         for k, v in kwargs.items():
             if k == output_arg_name:
@@ -81,12 +82,18 @@ def make_cli(func, output_arg_name="output"):
 
 
 def register_command(
-    func, app: typer.Typer, func_name: str = None, output_arg_name="output"
+    app: typer.Typer, func_name: Optional[str] = None, output_arg_name: str = "output"
 ):
     """Register function as command"""
-    func_cli = make_cli(func, output_arg_name=output_arg_name)
 
-    @app.command()
-    @wraps(func_cli, func_name=func_name)
-    def foo(*args, **kwargs):
-        return func_cli(*args, **kwargs)
+    def decorator(func):
+        func_cli = make_cli(func, output_arg_name=output_arg_name)
+
+        @app.command()
+        @wraps(func_cli, func_name=func_name)
+        def foo(*args, **kwargs):
+            return func_cli(*args, **kwargs)
+
+        return func
+
+    return decorator
