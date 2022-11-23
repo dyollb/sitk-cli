@@ -3,6 +3,7 @@
 [![Build Actions Status](https://github.com/dyollb/segmantic/workflows/CI/badge.svg)](https://github.com/dyollb/sitk-cli/actions)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/sitk-cli.svg)](https://badge.fury.io/py/sitk-cli)
+<img src="https://img.shields.io/pypi/dm/sitk-cli.svg?label=pypi%20downloads&logo=python&logoColor=green"/>
 
 ## Overview
 
