@@ -13,9 +13,12 @@ Create [Typer](https://github.com/tiangolo/typer) command line interface from fu
 import SimpleITK as sitk
 import typer
 
-from sitk_cli import make_cli
+from sitk_cli import register_command
+
+app = typer.Typer()
 
 
+@register_command(app)
 def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
     mask = mask != 0
     output = sitk.Image(mask.GetSize(), mask.GetPixelID())
@@ -26,7 +29,7 @@ def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
 
 
 if __name__ == "__main__":
-    typer.run(make_cli(fill_holes_slice_by_slice))
+    app()
 ```
 
 ## Installation
@@ -37,4 +40,4 @@ pip install sitk-cli
 
 ## Demo
 
-![](./docs/demo.gif)
+![Command lind demo](https://github.com/dyollb/sitk-cli/raw/main/docs/demo.gif)
