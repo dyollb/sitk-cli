@@ -7,7 +7,7 @@
 
 ## Overview
 
-Create [Typer](https://github.com/tiangolo/typer) command line interface from functions that use [SimpleITK](https://github.com/SimpleITK/SimpleITK) images (and transforms) as arguments or return type.
+Create [Typer](https://github.com/tiangolo/typer) command line interface from functions that use [SimpleITK](https://github.com/SimpleITK/SimpleITK) images (and transforms) as arguments or return type. 
 
 ```Python
 import SimpleITK as sitk
@@ -31,6 +31,8 @@ def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
 if __name__ == "__main__":
     app()
 ```
+
+To work, sitk-cli inspects the type annotations of the function and creates a wrapper function that loads images from file and passes these to the original function. Returned images (transforms) are written to a file by the wrapper function..
 
 ## Installation
 
