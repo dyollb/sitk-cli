@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import SimpleITK as sitk
 import typer
@@ -9,7 +9,16 @@ app = typer.Typer()
 
 
 @register_command(app)
-def median_filter(input: sitk.Image, radius: int) -> sitk.Image:
+def add(input1: sitk.Image, input2: Union[sitk.Image, None] = None) -> sitk.Image:
+    """Perform foo filtering"""
+    if input2:
+        sum: sitk.Image = input1 + input2
+        return sum
+    return input1
+
+
+@register_command(app)
+def median_filter(input: sitk.Image, radius: int = 2) -> sitk.Image:
     """Perform median filtering"""
     image: sitk.Image = sitk.Median(input, [radius] * input.GetDimension())
     return image

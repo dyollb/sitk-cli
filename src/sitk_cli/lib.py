@@ -1,6 +1,6 @@
 from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, get_args, get_origin
 
 import SimpleITK as sitk
 import typer
@@ -14,10 +14,15 @@ def make_cli(func, output_arg_name="output"):
 
     def _translate_param(p: Parameter):
         annotation, default = p.annotation, p.default
-        if isclass(p.annotation) and issubclass(
-            p.annotation, (sitk.Image, sitk.Transform)
-        ):
-            if issubclass(p.annotation, sitk.Image):
+
+        # handle Optional[A] and Union[A, None]
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+        if origin is Union and args and not isinstance(args[0], type(None)):
+            annotation = get_args(annotation)[0]
+
+        if isclass(annotation) and issubclass(annotation, (sitk.Image, sitk.Transform)):
+            if issubclass(annotation, sitk.Image):
                 image_args.append(p.name)
             else:
                 transform_args.append(p.name)
