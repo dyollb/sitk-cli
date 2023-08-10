@@ -1,6 +1,6 @@
 from inspect import signature
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import SimpleITK as sitk
 
@@ -20,6 +20,10 @@ def register_api(
 ) -> sitk.Transform:
     tx = sitk.CenteredTransformInitializer(fixed, moving)
     return sitk.CompositeTransform([init_transform, tx])
+
+
+def select_image(input1: sitk.Image, input2: Optional[sitk.Image]) -> sitk.Image:
+    return input1 if input2 is None else input2
 
 
 def test_make_cli_image_arg():
@@ -62,3 +66,13 @@ def test_make_cli_transform_arg():
     assert issubclass(sig.parameters["moving"].annotation, Path)
     assert issubclass(sig.parameters["init_transform"].annotation, Path)
     assert issubclass(sig.parameters["output_transform"].annotation, Path)
+
+
+def test_optional_argument():
+    cli = sitk_cli.make_cli(select_image)
+    sig = signature(cli)
+
+    assert len(sig.parameters) == 3
+    assert sig.parameters["input1"].annotation is Path
+    assert sig.parameters["input2"].annotation is Path
+    assert sig.parameters["output"].annotation, Path

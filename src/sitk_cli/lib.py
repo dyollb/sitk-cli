@@ -1,6 +1,12 @@
+
+import sys
 from inspect import Parameter, isclass, signature
 from pathlib import Path
 from typing import Optional, Union, get_args, get_origin
+if sys.version_info >= (3,10):
+    from types import UnionType as UnionType
+else:
+    from typing import Union as UnionType
 
 import SimpleITK as sitk
 import typer
@@ -12,14 +18,29 @@ def make_cli(func, output_arg_name="output"):
     image_args = []
     transform_args = []
 
-    def _translate_param(p: Parameter):
-        annotation, default = p.annotation, p.default
+    def _parse_annotation(annotation):
+        """handle Optional[A], Union[A, None] and A | None, and string annotations"""
+        if isinstance(annotation, str):
+            if sys.version_info >= (3,10):
+                annotation = eval(annotation)
+            else:
+                if "|" in annotation:
+                    types = ",".join(t.strip() for t in annotation.split("|"))
+                    annotation = f"Union[{types}]"
+                annotation = eval(annotation)
 
-        # handle Optional[A] and Union[A, None]
         origin = get_origin(annotation)
         args = get_args(annotation)
-        if origin is Union and args and not isinstance(args[0], type(None)):
-            annotation = get_args(annotation)[0]
+        if any(origin is t for t in (Union, UnionType)):
+            for a in args:
+                if not isinstance(a, type(None)):
+                    return a
+        return annotation
+
+    def _translate_param(p: Parameter):
+        """translate signature parameters"""
+        annotation = _parse_annotation(p.annotation)
+        default = p.default
 
         if isclass(annotation) and issubclass(annotation, (sitk.Image, sitk.Transform)):
             if issubclass(annotation, sitk.Image):
@@ -43,7 +64,7 @@ def make_cli(func, output_arg_name="output"):
     for idx, p in enumerate(func_sig.parameters.values()):
         params.append(_translate_param(p))
 
-    return_type = func_sig.return_annotation
+    return_type = _parse_annotation(func_sig.return_annotation)
     if (
         return_type
         and isclass(return_type)
