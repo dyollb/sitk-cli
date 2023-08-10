@@ -1,7 +1,12 @@
-import types
+
+import sys
 from inspect import Parameter, isclass, signature
 from pathlib import Path
 from typing import Optional, Union, get_args, get_origin
+if sys.version_info >= (3,10):
+    from types import UnionType as UnionType
+else:
+    from typing import Union as UnionType
 
 import SimpleITK as sitk
 import typer
@@ -16,10 +21,17 @@ def make_cli(func, output_arg_name="output"):
     def _parse_annotation(annotation):
         """handle Optional[A], Union[A, None] and A | None, and string annotations"""
         if isinstance(annotation, str):
-            annotation = eval(annotation)
+            if sys.version_info >= (3,10):
+                annotation = eval(annotation)
+            else:
+                if "|" in annotation:
+                    types = ",".join(t.strip() for t in annotation.split("|"))
+                    annotation = f"Union[{types}]"
+                annotation = eval(annotation)
+
         origin = get_origin(annotation)
         args = get_args(annotation)
-        if any(origin is t for t in (Union, types.UnionType)):
+        if any(origin is t for t in (Union, UnionType)):
             for a in args:
                 if not isinstance(a, type(None)):
                     return a
@@ -72,7 +84,7 @@ def make_cli(func, output_arg_name="output"):
 
     @wraps(func, new_sig=new_sig)
     def func_wrapper(*args, **kwargs):
-        output_file: Optional[Path] = None  # type: ignore [annotation-unchecked]
+        output_file: Optional[Path] = None
         kwargs_inner = {}
         for k, v in kwargs.items():
             if k == output_arg_name:

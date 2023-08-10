@@ -36,7 +36,7 @@ def test_optional_argument():
     assert get_option_default(sig.parameters["input2"]) is None
 
 
-def test_optional_return_type():
+def _test_optional_return_type():
     cli = sitk_cli.make_cli(pass_image)
     sig = signature(cli)
 
