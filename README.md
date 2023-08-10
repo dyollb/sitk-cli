@@ -7,7 +7,7 @@
 
 ## Overview
 
-Create [Typer](https://github.com/tiangolo/typer) command line interface from functions that use [SimpleITK](https://github.com/SimpleITK/SimpleITK) images (and transforms) as arguments or return type. 
+Create [Typer](https://github.com/tiangolo/typer) command line interface from functions that use [SimpleITK](https://github.com/SimpleITK/SimpleITK) images (and transforms) as arguments or return type.
 
 ```Python
 import SimpleITK as sitk
