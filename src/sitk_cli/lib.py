@@ -1,9 +1,9 @@
-
 import sys
 from inspect import Parameter, isclass, signature
 from pathlib import Path
 from typing import Optional, Union, get_args, get_origin
-if sys.version_info >= (3,10):
+
+if sys.version_info >= (3, 10):
     from types import UnionType as UnionType
 else:
     from typing import Union as UnionType
@@ -13,7 +13,7 @@ import typer
 from makefun import wraps
 
 
-def make_cli(func, output_arg_name="output"):
+def make_cli(func, output_arg_name="output", globals=None, locals=None):
     """Make command line interface from function with sitk.Image args"""
     image_args = []
     transform_args = []
@@ -21,13 +21,11 @@ def make_cli(func, output_arg_name="output"):
     def _parse_annotation(annotation):
         """handle Optional[A], Union[A, None] and A | None, and string annotations"""
         if isinstance(annotation, str):
-            if sys.version_info >= (3,10):
-                annotation = eval(annotation)
-            else:
+            if sys.version_info < (3, 10):
                 if "|" in annotation:
                     types = ",".join(t.strip() for t in annotation.split("|"))
                     annotation = f"Union[{types}]"
-                annotation = eval(annotation)
+            annotation = eval(annotation, globals, locals)
 
         origin = get_origin(annotation)
         args = get_args(annotation)
@@ -108,12 +106,18 @@ def make_cli(func, output_arg_name="output"):
 
 
 def register_command(
-    app: typer.Typer, func_name: Optional[str] = None, output_arg_name: str = "output"
+    app: typer.Typer,
+    func_name: Optional[str] = None,
+    output_arg_name: str = "output",
+    globals=None,
+    locals=None,
 ):
     """Register function as command"""
 
     def decorator(func):
-        func_cli = make_cli(func, output_arg_name=output_arg_name)
+        func_cli = make_cli(
+            func, output_arg_name=output_arg_name, globals=globals, locals=locals
+        )
 
         @app.command()
         @wraps(func_cli, func_name=func_name)
