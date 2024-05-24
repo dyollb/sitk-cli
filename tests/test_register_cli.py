@@ -1,22 +1,9 @@
-import SimpleITK as sitk
-import typer
 from typer.testing import CliRunner
-
-from sitk_cli import register_command
-
-app = typer.Typer()
-
-
-@register_command(app, func_name="centered-transform-initializer")
-def example_function(
-    fixed: sitk.Image, moving: sitk.Image, init_transform: sitk.Transform
-) -> sitk.Transform:
-    """Test function"""
-    tx = sitk.CenteredTransformInitializer(fixed, moving)
-    return sitk.CompositeTransform([init_transform, tx])
 
 
 def test_register_command():
+    from .example_function import app
+
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
