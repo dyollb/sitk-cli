@@ -21,13 +21,11 @@ def make_cli(func, output_arg_name="output", globals=None, locals=None):
     def _parse_annotation(annotation):
         """handle Optional[A], Union[A, None] and A | None, and string annotations"""
         if isinstance(annotation, str):
-            if sys.version_info >= (3, 10):
-                annotation = eval(annotation)
-            else:
+            if sys.version_info < (3, 10):
                 if "|" in annotation:
                     types = ",".join(t.strip() for t in annotation.split("|"))
                     annotation = f"Union[{types}]"
-                annotation = eval(annotation, globals, locals)
+            annotation = eval(annotation, globals, locals)
 
         origin = get_origin(annotation)
         args = get_args(annotation)
