@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     "makefun",
     "SimpleITK",
-    "typer",
+    "typer-slim",
 ]
 
 [project.optional-dependencies]
