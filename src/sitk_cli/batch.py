@@ -186,6 +186,19 @@ def create_batch_command(
         )
     )
 
+    # Add output_template as optional keyword-only parameter
+    keyword_only_params.append(
+        Parameter(
+            "output_template",
+            Parameter.KEYWORD_ONLY,
+            annotation=str,
+            default=typer.Option(
+                output_template,
+                help=f"Output filename template. Variables: {{stem}}, {{suffix}}, {{name}}. Default: {output_template}",
+            ),
+        )
+    )
+
     # Combine parameters in correct order: positional/keyword, then keyword-only
     new_params = positional_params + keyword_only_params
 
@@ -194,8 +207,15 @@ def create_batch_command(
     @wraps(func, new_sig=new_sig)  # type: ignore[misc,untyped-decorator]
     def batch_wrapper(*args: Any, **kwargs: Any) -> None:
         """Process multiple files in batch."""
-        # Extract output_dir from kwargs
+        # Extract output_dir and output_template from kwargs
         output_dir: Path = kwargs.pop("output_dir")
+        template_arg = kwargs.pop("output_template")
+
+        # Handle typer.Option default values (OptionInfo objects)
+        if isinstance(template_arg, typer.models.OptionInfo):
+            template: str = output_template  # Use default from create_batch_command
+        else:
+            template = template_arg  # Use runtime override
 
         # Build arg_map from both args and kwargs
         param_names = list(func_sig.parameters.keys())
@@ -289,7 +309,7 @@ def create_batch_command(
             _, suffix = _get_stem_and_suffix(output_file_ref)
 
             # Format output filename
-            output_name = output_template.format(
+            output_name = template.format(
                 stem=stem,
                 suffix=suffix,
                 name=output_file_ref.name,
