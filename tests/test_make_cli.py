@@ -101,3 +101,31 @@ def test_file_not_found_error_for_transform(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError, match="Input transform file not found"):
         process_cli(tx=nonexistent_file, output=tmp_path / "output.tfm")
+
+
+def test_auto_create_output_directories(tmp_path: Path) -> None:
+    """Test that output directories are created automatically when create_dirs=True."""
+    make_image_cli = sitk_cli.make_cli(make_image, create_dirs=True)
+
+    # Create output path with nested directories that don't exist
+    nested_output = tmp_path / "level1" / "level2" / "level3" / "output.nii.gz"
+    assert not nested_output.parent.exists()
+
+    # Should create directories automatically
+    make_image_cli(width=64, height=64, output=nested_output)
+
+    assert nested_output.exists()
+    assert nested_output.parent.exists()
+
+
+def test_no_auto_create_directories_when_disabled(tmp_path: Path) -> None:
+    """Test that directories are NOT created when create_dirs=False."""
+    make_image_cli = sitk_cli.make_cli(make_image, create_dirs=False)
+
+    # Create output path with directory that doesn't exist
+    nested_output = tmp_path / "nonexistent" / "output.nii.gz"
+    assert not nested_output.parent.exists()
+
+    # Should raise RuntimeError from SimpleITK when trying to write to non-existent directory
+    with pytest.raises(RuntimeError, match="failed to write image"):
+        make_image_cli(width=64, height=64, output=nested_output)

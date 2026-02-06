@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     "makefun",
     "SimpleITK",
-    "typer",
+    "typer-slim",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +36,9 @@ dev = [
     "pytest-cov",
     "pytest",
     "ruff",
+]
+rich = [
+    "rich",
 ]
 
 [project.urls]
@@ -78,7 +81,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "TC002"]  # allow assert in tests, allow runtime imports
+"tests/*" = ["S101", "TC002", "TC003"]  # allow assert in tests, allow runtime imports
+"examples/*" = ["TC002"]  # allow runtime imports in examples
 
 [tool.ruff.lint.isort]
 known-first-party = ["sitk_cli"]
@@ -103,7 +107,7 @@ disallow_any_explicit = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["setuptools", "SimpleITK", "makefun"]
+module = ["setuptools", "SimpleITK", "makefun", "rich.*"]
 ignore_missing_imports = true
 
 # Pytest configuration
