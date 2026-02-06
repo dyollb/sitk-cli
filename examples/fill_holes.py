@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import SimpleITK as sitk
 import typer
 

@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 from inspect import signature
 from pathlib import Path
-from typing import Optional, Tuple
 
 import SimpleITK as sitk
 
 import sitk_cli
 
 
-def get_shape(input: sitk.Image) -> Tuple[int, int]:
+def get_shape(input: sitk.Image) -> tuple[int, int]:
     return input.GetWidth(), input.GetHeight()
 
 
@@ -22,11 +23,11 @@ def register_api(
     return sitk.CompositeTransform([init_transform, tx])
 
 
-def select_image(input1: sitk.Image, input2: Optional[sitk.Image]) -> sitk.Image:
+def select_image(input1: sitk.Image, input2: sitk.Image | None) -> sitk.Image:
     return input1 if input2 is None else input2
 
 
-def test_make_cli_image_arg():
+def test_make_cli_image_arg() -> None:
     cli = sitk_cli.make_cli(get_shape)
     sig = signature(cli)
 
@@ -34,7 +35,7 @@ def test_make_cli_image_arg():
     assert issubclass(sig.parameters["input"].annotation, Path)
 
 
-def test_make_cli_image_return():
+def test_make_cli_image_return() -> None:
     cli = sitk_cli.make_cli(make_image)
     sig = signature(cli)
 
@@ -44,7 +45,7 @@ def test_make_cli_image_return():
     assert issubclass(sig.parameters["output"].annotation, Path)
 
 
-def test_make_cli_usage(tmp_path: Path):
+def test_make_cli_usage(tmp_path: Path) -> None:
     make_image_cli = sitk_cli.make_cli(make_image)
     get_width_cli = sitk_cli.make_cli(get_shape)
 
@@ -57,7 +58,7 @@ def test_make_cli_usage(tmp_path: Path):
     make_image_cli(width=32, height=64, output=None)
 
 
-def test_make_cli_transform_arg():
+def test_make_cli_transform_arg() -> None:
     cli = sitk_cli.make_cli(register_api, output_arg_name="output_transform")
     sig = signature(cli)
 
@@ -68,7 +69,7 @@ def test_make_cli_transform_arg():
     assert issubclass(sig.parameters["output_transform"].annotation, Path)
 
 
-def test_optional_argument():
+def test_optional_argument() -> None:
     cli = sitk_cli.make_cli(select_image)
     sig = signature(cli)
 
