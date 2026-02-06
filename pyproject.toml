@@ -31,11 +31,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "build",
     "mypy",
     "pre-commit",
     "pytest-cov",
     "pytest",
     "ruff",
+    "twine",
 ]
 rich = [
     "rich",
