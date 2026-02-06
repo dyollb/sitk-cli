@@ -3,6 +3,7 @@ from __future__ import annotations
 from inspect import signature
 from pathlib import Path
 
+import pytest
 import SimpleITK as sitk
 
 import sitk_cli
@@ -77,3 +78,26 @@ def test_optional_argument() -> None:
     assert sig.parameters["input1"].annotation is Path
     assert sig.parameters["input2"].annotation is Path
     assert sig.parameters["output"].annotation, Path
+
+
+def test_file_not_found_error_for_image(tmp_path: Path) -> None:
+    """Test that FileNotFoundError is raised when input image file doesn't exist."""
+    get_shape_cli = sitk_cli.make_cli(get_shape)
+    nonexistent_file = tmp_path / "does_not_exist.nii.gz"
+
+    with pytest.raises(FileNotFoundError, match="Input image file not found"):
+        get_shape_cli(input=nonexistent_file)
+
+
+def test_file_not_found_error_for_transform(tmp_path: Path) -> None:
+    """Test that FileNotFoundError is raised when input transform file doesn't exist."""
+
+    # Create a simple function that takes a transform
+    def process_transform(tx: sitk.Transform) -> sitk.Transform:
+        return tx
+
+    process_cli = sitk_cli.make_cli(process_transform)
+    nonexistent_file = tmp_path / "does_not_exist.tfm"
+
+    with pytest.raises(FileNotFoundError, match="Input transform file not found"):
+        process_cli(tx=nonexistent_file, output=tmp_path / "output.tfm")

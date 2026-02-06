@@ -21,14 +21,39 @@ def make_cli(
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> FuncType:
-    """Make command line interface from function with sitk.Image args."""
+    """Make command line interface from function with sitk.Image args.
+
+    Transforms a function that uses SimpleITK Image/Transform objects into a CLI
+    that accepts file paths. Automatically handles loading from and saving to files.
+
+    Args:
+        func: Function to wrap with CLI functionality
+        output_arg_name: Name for the output file parameter (default: "output")
+        globals: Global namespace for evaluating string annotations
+        locals: Local namespace for evaluating string annotations
+
+    Returns:
+        Wrapped function that accepts Path arguments and handles file I/O
+
+    Raises:
+        FileNotFoundError: If input files don't exist
+        ValueError: If annotation parsing fails
+    """
     image_args: list[str] = []
     transform_args: list[str] = []
 
     def _parse_annotation(annotation: Any) -> Any:
-        """Handle Optional[A], Union[A, None] and A | None, and string annotations."""
+        """Parse type annotation, handling Optional/Union and string annotations.
+
+        String annotations need evaluation to convert to actual types. This is
+        necessary when annotations reference types not yet defined at parse time.
+        """
         if isinstance(annotation, str):
-            annotation = eval(annotation, globals, locals)
+            try:
+                annotation = eval(annotation, globals, locals)
+            except Exception as e:
+                msg = f"Failed to parse type annotation '{annotation}': {e}"
+                raise ValueError(msg) from e
 
         origin = get_origin(annotation)
         args = get_args(annotation)
@@ -39,7 +64,11 @@ def make_cli(
         return annotation
 
     def _translate_param(p: Parameter) -> Parameter:
-        """Translate signature parameters."""
+        """Translate function parameters for CLI compatibility.
+
+        Converts SimpleITK Image/Transform parameters to Path parameters,
+        tracks which parameters need file I/O, and sets appropriate defaults.
+        """
         annotation = _parse_annotation(p.annotation)
         default = p.default
 
@@ -92,8 +121,14 @@ def make_cli(
                 output_file = v
                 continue
             if k in image_args and isinstance(v, Path):
+                if not v.exists():
+                    msg = f"Input image file not found: {v}"
+                    raise FileNotFoundError(msg)
                 v = sitk.ReadImage(str(v))
             if k in transform_args and isinstance(v, Path):
+                if not v.exists():
+                    msg = f"Input transform file not found: {v}"
+                    raise FileNotFoundError(msg)
                 v = sitk.ReadTransform(str(v))
             kwargs_inner[k] = v
 
@@ -114,7 +149,20 @@ def register_command(
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
-    """Register function as command."""
+    """Register a function as a Typer command.
+
+    Decorator that wraps a function with make_cli and registers it with a Typer app.
+
+    Args:
+        app: Typer application instance to register the command with
+        func_name: Custom name for the command (default: use function name)
+        output_arg_name: Name for the output file parameter (default: "output")
+        globals: Global namespace for evaluating string annotations
+        locals: Local namespace for evaluating string annotations
+
+    Returns:
+        Decorator function that registers and returns the original function
+    """
 
     def decorator(func: FuncType) -> FuncType:
         func_cli = make_cli(
