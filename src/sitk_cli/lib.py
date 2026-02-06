@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Any, TypeAlias, get_args, get_origin
+from typing import Any, Literal, TypeAlias, get_args, get_origin
 
 import SimpleITK as sitk
 import typer
@@ -21,6 +21,7 @@ def make_cli(
     output_arg_name: str = "output",
     create_dirs: bool = True,
     verbose: bool = False,
+    overwrite: bool | Literal["prompt"] = True,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> FuncType:
@@ -40,6 +41,10 @@ def make_cli(
         output_arg_name: Name for the output file parameter (default: "output")
         create_dirs: Auto-create parent directories for output files (default: True)
         verbose: Add --verbose/-v flag for logging control (default: False)
+        overwrite: Control output file overwrite behavior (default: True)
+            - True: Always overwrite existing files
+            - False: Error if output file exists (adds --force flag to override)
+            - "prompt": Ask user interactively (adds --force flag to skip prompt)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -186,6 +191,22 @@ def make_cli(
             )
         )
 
+    # Add force flag if overwrite protection is enabled
+    if overwrite is not True:
+        params.append(
+            Parameter(
+                "_force",
+                kind=Parameter.POSITIONAL_OR_KEYWORD,
+                default=typer.Option(
+                    False,
+                    "--force",
+                    "-f",
+                    help="Force overwrite of existing output files",
+                ),
+                annotation=bool,
+            )
+        )
+
     new_sig = func_sig.replace(parameters=params, return_annotation=return_type)
 
     @wraps(func, new_sig=new_sig)  # type: ignore[misc,untyped-decorator]
@@ -200,10 +221,15 @@ def make_cli(
                 logger.setLevel(logging.DEBUG)
 
         output_file: Path | None = None
+        force: bool = False
         kwargs_inner: dict[str, Any] = {}
         for k, v in kwargs.items():
             if k == output_arg_name:
                 output_file = v
+                continue
+            if k == "_force":
+                # Extract boolean value from typer.Option if needed
+                force = bool(v.default if isinstance(v, typer.models.OptionInfo) else v)
                 continue
             if k in image_args and isinstance(v, Path):
                 if not v.exists():
@@ -219,6 +245,23 @@ def make_cli(
 
         ret = func(*args, **kwargs_inner)
         if output_file and ret:
+            # Check for overwrite protection
+            if overwrite is not True and not force and output_file.exists():
+                if overwrite == "prompt":
+                    # Interactive prompt
+                    response = input(
+                        f"Output file '{output_file}' exists. Overwrite? [y/N]: "
+                    )
+                    if response.lower() not in ("y", "yes"):
+                        print("Operation cancelled.")
+                        return None
+                else:  # overwrite is False
+                    msg = (
+                        f"Output file '{output_file}' already exists. "
+                        "Use --force to overwrite."
+                    )
+                    raise FileExistsError(msg)
+
             if create_dirs:
                 output_file.parent.mkdir(parents=True, exist_ok=True)
             if isinstance(ret, sitk.Image):
@@ -235,6 +278,7 @@ def register_command(
     output_arg_name: str = "output",
     create_dirs: bool = True,
     verbose: bool = False,
+    overwrite: bool | Literal["prompt"] = True,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
@@ -248,6 +292,10 @@ def register_command(
         output_arg_name: Name for the output file parameter (default: "output")
         create_dirs: Auto-create parent directories for output files (default: True)
         verbose: Add --verbose/-v flag for logging control (default: False)
+        overwrite: Control output file overwrite behavior (default: True)
+            - True: Always overwrite existing files
+            - False: Error if output file exists (adds --force flag to override)
+            - "prompt": Ask user interactively (adds --force flag to skip prompt)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -277,6 +325,7 @@ def register_command(
             output_arg_name=output_arg_name,
             create_dirs=create_dirs,
             verbose=verbose,
+            overwrite=overwrite,
             globals=globals,
             locals=locals,
         )

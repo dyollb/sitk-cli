@@ -81,7 +81,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "TC002"]  # allow assert in tests, allow runtime imports
+"tests/*" = ["S101", "TC002", "TC003"]  # allow assert in tests, allow runtime imports
+"examples/*" = ["TC002"]  # allow runtime imports in examples
 
 [tool.ruff.lint.isort]
 known-first-party = ["sitk_cli"]
