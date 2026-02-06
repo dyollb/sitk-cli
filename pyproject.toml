@@ -107,7 +107,7 @@ disallow_any_explicit = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["setuptools", "SimpleITK", "makefun"]
+module = ["setuptools", "SimpleITK", "makefun", "rich.*"]
 ignore_missing_imports = true
 
 # Pytest configuration
