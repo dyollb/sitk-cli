@@ -18,6 +18,7 @@ DecoratorType: TypeAlias = Callable[[FuncType], FuncType]
 def make_cli(
     func: FuncType,
     output_arg_name: str = "output",
+    create_dirs: bool = True,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> FuncType:
@@ -29,6 +30,7 @@ def make_cli(
     Args:
         func: Function to wrap with CLI functionality
         output_arg_name: Name for the output file parameter (default: "output")
+        create_dirs: Auto-create parent directories for output files (default: True)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -134,6 +136,8 @@ def make_cli(
 
         ret = func(*args, **kwargs_inner)
         if output_file and ret:
+            if create_dirs:
+                output_file.parent.mkdir(parents=True, exist_ok=True)
             if isinstance(ret, sitk.Image):
                 return sitk.WriteImage(ret, str(output_file))
             return sitk.WriteTransform(ret, str(output_file))
@@ -146,6 +150,7 @@ def register_command(
     app: typer.Typer,
     func_name: str | None = None,
     output_arg_name: str = "output",
+    create_dirs: bool = True,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
@@ -157,6 +162,7 @@ def register_command(
         app: Typer application instance to register the command with
         func_name: Custom name for the command (default: use function name)
         output_arg_name: Name for the output file parameter (default: "output")
+        create_dirs: Auto-create parent directories for output files (default: True)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -166,7 +172,11 @@ def register_command(
 
     def decorator(func: FuncType) -> FuncType:
         func_cli = make_cli(
-            func, output_arg_name=output_arg_name, globals=globals, locals=locals
+            func,
+            output_arg_name=output_arg_name,
+            create_dirs=create_dirs,
+            globals=globals,
+            locals=locals,
         )
 
         @app.command()
