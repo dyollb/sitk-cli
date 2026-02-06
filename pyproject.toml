@@ -1,2 +1,141 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]   # PEP 508 specifications.
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sitk-cli"
+dynamic = ["version"]
+description = "Wrap SimpleITK functions as command lines"
+readme = "README.md"
+license = {text = "MIT License"}
+requires-python = ">=3.11"
+authors = [
+    {name = "dyollb"}
+]
+keywords = ["SimpleITK", "CLI", "Typer", "medical imaging"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "makefun",
+    "SimpleITK",
+    "typer",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy",
+    "pre-commit",
+    "pytest-cov",
+    "pytest",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/dyollb/sitk-cli"
+"Bug Tracker" = "https://github.com/dyollb/sitk-cli/issues"
+"Source Code" = "https://github.com/dyollb/sitk-cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.dynamic]
+version = {attr = "sitk_cli.__version__"}
+
+# Ruff configuration
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (includes unused imports like pycln)
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "N813",   # camelcase imported as lowercase (SimpleITK as sitk is standard)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "TC002"]  # allow assert in tests, allow runtime imports
+
+[tool.ruff.lint.isort]
+known-first-party = ["sitk_cli"]
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+warn_return_any = false
+strict_equality = true
+show_column_numbers = true
+show_error_codes = true
+disallow_untyped_defs = true
+disallow_untyped_calls = false
+disallow_any_unimported = false
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["setuptools", "SimpleITK", "makefun"]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=sitk_cli",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+
+[tool.coverage.run]
+source = ["src/sitk_cli"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+precision = 2
+show_missing = true

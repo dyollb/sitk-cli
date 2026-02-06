@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from inspect import Parameter, signature
 from pathlib import Path
+from typing import Any
 
 import SimpleITK as sitk
 from typer.models import OptionInfo
@@ -17,13 +18,13 @@ def pass_image(name: str, input: sitk.Image | None = None) -> sitk.Image | None:
     return input
 
 
-def get_option_default(p: Parameter):
+def get_option_default(p: Parameter) -> Any:
     input_default: OptionInfo = p.default
     assert isinstance(input_default, OptionInfo)
     return input_default.default
 
 
-def test_optional_argument():
+def test_optional_argument() -> None:
     cli = sitk_cli.make_cli(select_image)
     sig = signature(cli)
 
@@ -36,7 +37,7 @@ def test_optional_argument():
     assert get_option_default(sig.parameters["input2"]) is None
 
 
-def _test_optional_return_type():
+def _test_optional_return_type() -> None:
     cli = sitk_cli.make_cli(pass_image)
     sig = signature(cli)
 

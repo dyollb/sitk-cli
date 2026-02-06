@@ -1,15 +1,14 @@
 default_language_version:
-  python: python3
+  python: python3.11
 
 ci:
   autofix_prs: true
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit suggestions'
   autoupdate_schedule: quarterly
-  # submodules: true
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
@@ -22,21 +21,29 @@ repos:
         args: ['--maxkb=1024']
       - id: detect-private-key
 
-  - repo: https://github.com/psf/black
-    rev: 23.3.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
     hooks:
-      - id: black
-        name: format code
+      - id: ruff-check
+        name: ruff lint
+        args: [--fix]
+      - id: ruff-format
+        name: ruff format
 
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
     hooks:
-      - id: isort
-        name: format imports
-        args: ["--profile", "black"]
+      - id: mypy
+        name: type check
+        args: [--config-file=pyproject.toml]
+        additional_dependencies:
+          - types-setuptools
+          - typer
+          - makefun
+        exclude: ^(tests/|examples/)
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.16
+    rev: 1.0.0
     hooks:
       - id: mdformat
         name: format markdown
@@ -45,33 +52,12 @@ repos:
           - mdformat_frontmatter
         exclude: CHANGELOG.md
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 6.0.0
-    hooks:
-      - id: flake8
-        name: check PEP8
-        args: ["--ignore=E501,W503,E203"]
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.7.0
-    hooks:
-      - id: pyupgrade
-        name: upgrade code
-        args: ["--py37-plus"]
-
-  - repo: https://github.com/hadialqattan/pycln
-    rev: v2.1.5
-    hooks:
-      - id: pycln
-        name: prune imports
-        args: [--expand-stars]
-
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.7.0
+    rev: 1.9.1
     hooks:
-      - id: nbqa-black
-        additional_dependencies: [black]
-        name: format notebooks
+      - id: nbqa-ruff
+        name: lint notebooks
+        args: [--fix]
       - id: nbqa-mypy
         additional_dependencies: [mypy]
-        name: static analysis for notebooks
+        name: type check notebooks

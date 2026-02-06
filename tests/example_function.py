@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 import SimpleITK as sitk
 import typer
@@ -8,7 +8,7 @@ import typer
 from sitk_cli import register_command
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     moments = "moments"
     geometry = "geometry"
 

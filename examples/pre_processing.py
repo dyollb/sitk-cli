@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from __future__ import annotations
 
 import SimpleITK as sitk
 import typer
@@ -9,7 +9,7 @@ app = typer.Typer()
 
 
 @register_command(app)
-def add(input1: sitk.Image, input2: Union[sitk.Image, None] = None) -> sitk.Image:
+def add(input1: sitk.Image, input2: sitk.Image | None = None) -> sitk.Image:
     """Perform foo filtering"""
     if input2:
         sum: sitk.Image = input1 + input2
@@ -27,7 +27,7 @@ def median_filter(input: sitk.Image, radius: int = 2) -> sitk.Image:
 @register_command(app)
 def bias_correct(
     input: sitk.Image,
-    mask: Optional[sitk.Image] = None,
+    mask: sitk.Image | None = None,
     shrink_factor: int = 4,
     num_fitting_levels: int = 4,
     num_iterations: int = 50,

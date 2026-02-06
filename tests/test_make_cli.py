@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 from inspect import signature
 from pathlib import Path
-from typing import Optional, Tuple
 
+import pytest
 import SimpleITK as sitk
 
 import sitk_cli
 
 
-def get_shape(input: sitk.Image) -> Tuple[int, int]:
+def get_shape(input: sitk.Image) -> tuple[int, int]:
     return input.GetWidth(), input.GetHeight()
 
 
@@ -22,11 +24,11 @@ def register_api(
     return sitk.CompositeTransform([init_transform, tx])
 
 
-def select_image(input1: sitk.Image, input2: Optional[sitk.Image]) -> sitk.Image:
+def select_image(input1: sitk.Image, input2: sitk.Image | None) -> sitk.Image:
     return input1 if input2 is None else input2
 
 
-def test_make_cli_image_arg():
+def test_make_cli_image_arg() -> None:
     cli = sitk_cli.make_cli(get_shape)
     sig = signature(cli)
 
@@ -34,7 +36,7 @@ def test_make_cli_image_arg():
     assert issubclass(sig.parameters["input"].annotation, Path)
 
 
-def test_make_cli_image_return():
+def test_make_cli_image_return() -> None:
     cli = sitk_cli.make_cli(make_image)
     sig = signature(cli)
 
@@ -44,7 +46,7 @@ def test_make_cli_image_return():
     assert issubclass(sig.parameters["output"].annotation, Path)
 
 
-def test_make_cli_usage(tmp_path: Path):
+def test_make_cli_usage(tmp_path: Path) -> None:
     make_image_cli = sitk_cli.make_cli(make_image)
     get_width_cli = sitk_cli.make_cli(get_shape)
 
@@ -57,7 +59,7 @@ def test_make_cli_usage(tmp_path: Path):
     make_image_cli(width=32, height=64, output=None)
 
 
-def test_make_cli_transform_arg():
+def test_make_cli_transform_arg() -> None:
     cli = sitk_cli.make_cli(register_api, output_arg_name="output_transform")
     sig = signature(cli)
 
@@ -68,7 +70,7 @@ def test_make_cli_transform_arg():
     assert issubclass(sig.parameters["output_transform"].annotation, Path)
 
 
-def test_optional_argument():
+def test_optional_argument() -> None:
     cli = sitk_cli.make_cli(select_image)
     sig = signature(cli)
 
@@ -76,3 +78,26 @@ def test_optional_argument():
     assert sig.parameters["input1"].annotation is Path
     assert sig.parameters["input2"].annotation is Path
     assert sig.parameters["output"].annotation, Path
+
+
+def test_file_not_found_error_for_image(tmp_path: Path) -> None:
+    """Test that FileNotFoundError is raised when input image file doesn't exist."""
+    get_shape_cli = sitk_cli.make_cli(get_shape)
+    nonexistent_file = tmp_path / "does_not_exist.nii.gz"
+
+    with pytest.raises(FileNotFoundError, match="Input image file not found"):
+        get_shape_cli(input=nonexistent_file)
+
+
+def test_file_not_found_error_for_transform(tmp_path: Path) -> None:
+    """Test that FileNotFoundError is raised when input transform file doesn't exist."""
+
+    # Create a simple function that takes a transform
+    def process_transform(tx: sitk.Transform) -> sitk.Transform:
+        return tx
+
+    process_cli = sitk_cli.make_cli(process_transform)
+    nonexistent_file = tmp_path / "does_not_exist.tfm"
+
+    with pytest.raises(FileNotFoundError, match="Input transform file not found"):
+        process_cli(tx=nonexistent_file, output=tmp_path / "output.tfm")
