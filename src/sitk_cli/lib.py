@@ -27,6 +27,12 @@ def make_cli(
     Transforms a function that uses SimpleITK Image/Transform objects into a CLI
     that accepts file paths. Automatically handles loading from and saving to files.
 
+    Behavior:
+        - Required Image/Transform parameters → positional arguments
+        - Keyword-only Image/Transform parameters (after *,) → named options
+        - Optional Image/Transform parameters (with defaults) → named options
+        - Output → positional if ANY input is positional, otherwise named
+
     Args:
         func: Function to wrap with CLI functionality
         output_arg_name: Name for the output file parameter (default: "output")
@@ -40,9 +46,28 @@ def make_cli(
     Raises:
         FileNotFoundError: If input files don't exist
         ValueError: If annotation parsing fails
+
+    Examples:
+        >>> def process(input: sitk.Image) -> sitk.Image:
+        ...     return input
+        # CLI: process INPUT OUTPUT
+
+        >>> def process(*, input: sitk.Image) -> sitk.Image:
+        ...     return input
+        # CLI: process --input INPUT --output OUTPUT
+
+        >>> def process(input: sitk.Image, *, mask: sitk.Image) -> sitk.Image:
+        ...     return input * mask
+        # CLI: process INPUT OUTPUT --mask MASK
     """
     image_args: list[str] = []
     transform_args: list[str] = []
+    has_positional_input = (
+        False  # Track if we see any positional Image/Transform inputs
+    )
+    has_any_image_transform_input = (
+        False  # Track if we see any Image/Transform inputs at all
+    )
 
     def _parse_annotation(annotation: Any) -> Any:
         """Parse type annotation, handling Optional/Union and string annotations.
@@ -70,18 +95,38 @@ def make_cli(
 
         Converts SimpleITK Image/Transform parameters to Path parameters,
         tracks which parameters need file I/O, and sets appropriate defaults.
+        Uses Typer convention: Argument() for positional, Option() for named.
+        Respects Python's keyword-only parameters (after *,).
         """
+        nonlocal has_positional_input, has_any_image_transform_input
         annotation = _parse_annotation(p.annotation)
         default = p.default
+        is_keyword_only = p.kind == Parameter.KEYWORD_ONLY
 
         if isclass(annotation) and issubclass(annotation, (sitk.Image, sitk.Transform)):
+            has_any_image_transform_input = True
             if issubclass(annotation, sitk.Image):
                 image_args.append(p.name)
             else:
                 transform_args.append(p.name)
             annotation = Path
-            default = typer.Option(None) if p.default is None else typer.Option(...)
+
+            # Determine if this should be positional or named
+            if is_keyword_only:
+                # Keyword-only parameter (after *, in signature) is always named
+                default = typer.Option(None) if p.default is None else typer.Option(...)
+            elif p.default is Parameter.empty:
+                # Positional: required Image/Transform without default
+                default = typer.Argument(...)
+                has_positional_input = True  # Mark that we've seen a positional input
+            elif p.default is None:
+                # Named: optional Image/Transform (has default)
+                default = typer.Option(None)
+            else:
+                # Named: Image/Transform with non-None default
+                default = typer.Option(...)
         elif p.default == Parameter.empty:
+            # Non-Image/Transform required parameters stay as named options
             default = typer.Option(...)
         return Parameter(
             p.name,
@@ -102,11 +147,20 @@ def make_cli(
         and isclass(return_type)
         and issubclass(return_type, (sitk.Image, sitk.Transform))
     ):
+        # Output is positional if:
+        # 1. There's at least one positional Image/Transform input, OR
+        # 2. There are no Image/Transform inputs at all (e.g., generator functions)
+        # Output is named only when ALL Image/Transform inputs are keyword-only
+        output_default = (
+            typer.Argument(...)
+            if (has_positional_input or not has_any_image_transform_input)
+            else None
+        )
         params.append(
             Parameter(
                 output_arg_name,
                 kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=None,
+                default=output_default,
                 annotation=Path,
             ),
         )
@@ -168,6 +222,22 @@ def register_command(
 
     Returns:
         Decorator function that registers and returns the original function
+
+    Examples:
+        >>> @register_command(app)
+        ... def process(input: sitk.Image) -> sitk.Image:
+        ...     return input
+        # CLI: process INPUT OUTPUT
+
+        >>> @register_command(app)
+        ... def process(*, input: sitk.Image) -> sitk.Image:
+        ...     return input
+        # CLI: process --input INPUT --output OUTPUT
+
+        >>> @register_command(app)
+        ... def process(input: sitk.Image, *, mask: sitk.Image) -> sitk.Image:
+        ...     return input * mask
+        # CLI: process INPUT OUTPUT --mask MASK
     """
 
     def decorator(func: FuncType) -> FuncType:
