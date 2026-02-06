@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from inspect import Parameter, isclass, signature
 from pathlib import Path
@@ -19,6 +20,7 @@ def make_cli(
     func: FuncType,
     output_arg_name: str = "output",
     create_dirs: bool = True,
+    verbose: bool = False,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> FuncType:
@@ -37,6 +39,7 @@ def make_cli(
         func: Function to wrap with CLI functionality
         output_arg_name: Name for the output file parameter (default: "output")
         create_dirs: Auto-create parent directories for output files (default: True)
+        verbose: Add --verbose/-v flag for logging control (default: False)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -166,10 +169,36 @@ def make_cli(
         )
         return_type = None
 
+    # Add verbose parameter if requested
+    if verbose:
+        params.append(
+            Parameter(
+                "_verbose",
+                kind=Parameter.POSITIONAL_OR_KEYWORD,
+                default=typer.Option(
+                    0,
+                    "--verbose",
+                    "-v",
+                    count=True,
+                    help="Increase verbosity (-v for INFO, -vv for DEBUG)",
+                ),
+                annotation=int,
+            )
+        )
+
     new_sig = func_sig.replace(parameters=params, return_annotation=return_type)
 
     @wraps(func, new_sig=new_sig)  # type: ignore[misc,untyped-decorator]
     def func_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Configure logging based on verbosity level
+        if verbose and "_verbose" in kwargs:
+            verbose_level = kwargs.pop("_verbose")
+            logger = logging.getLogger("sitk_cli")
+            if verbose_level == 1:
+                logger.setLevel(logging.INFO)
+            elif verbose_level >= 2:
+                logger.setLevel(logging.DEBUG)
+
         output_file: Path | None = None
         kwargs_inner: dict[str, Any] = {}
         for k, v in kwargs.items():
@@ -205,6 +234,7 @@ def register_command(
     func_name: str | None = None,
     output_arg_name: str = "output",
     create_dirs: bool = True,
+    verbose: bool = False,
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
@@ -217,6 +247,7 @@ def register_command(
         func_name: Custom name for the command (default: use function name)
         output_arg_name: Name for the output file parameter (default: "output")
         create_dirs: Auto-create parent directories for output files (default: True)
+        verbose: Add --verbose/-v flag for logging control (default: False)
         globals: Global namespace for evaluating string annotations
         locals: Local namespace for evaluating string annotations
 
@@ -245,6 +276,7 @@ def register_command(
             func,
             output_arg_name=output_arg_name,
             create_dirs=create_dirs,
+            verbose=verbose,
             globals=globals,
             locals=locals,
         )

@@ -6,14 +6,10 @@ the output parameter is positional by default (unless you use *, syntax).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+import SimpleITK as sitk
 import typer
 
 from sitk_cli import register_command
-
-if TYPE_CHECKING:
-    import SimpleITK as sitk
 
 app = typer.Typer()
 
@@ -26,9 +22,7 @@ def create_blank() -> sitk.Image:
 
     Output is positional because there are no Image/Transform inputs.
     """
-    import SimpleITK as sitk_
-
-    return sitk_.Image([100, 100], sitk_.sitkUInt8)
+    return sitk.Image([100, 100], sitk.sitkUInt8)
 
 
 @register_command(app)
@@ -42,9 +36,7 @@ def create_checkerboard(
 
     Output is positional, size/square_size are named options with defaults.
     """
-    import SimpleITK as sitk_
-
-    image = sitk_.Image([size, size], sitk_.sitkUInt8)
+    image = sitk.Image([size, size], sitk.sitkUInt8)
     for y in range(size):
         for x in range(size):
             if (x // square_size + y // square_size) % 2 == 0:
@@ -64,9 +56,7 @@ def create_gradient(
 
     Using *, makes all parameters keyword-only, so output is also named.
     """
-    import SimpleITK as sitk_
-
-    image = sitk_.Image([width, height], sitk_.sitkUInt8)
+    image = sitk.Image([width, height], sitk.sitkUInt8)
     for y in range(height):
         for x in range(width):
             image.SetPixel([x, y], int(255 * x / width))

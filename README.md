@@ -22,6 +22,13 @@ Create [Typer](https://github.com/tiangolo/typer) command line interfaces from f
 pip install sitk-cli
 ```
 
+**Optional dependencies:**
+
+```sh
+# For enhanced logging output with colors and formatting
+pip install sitk-cli[rich]
+```
+
 **Requirements:** Python 3.11 or higher
 
 ## Quick Start
@@ -116,7 +123,7 @@ git clone https://github.com/dyollb/sitk-cli.git
 cd sitk-cli
 python -m venv .venv
 source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
-pip install -e '.[dev]'
+pip install -e '.[dev,rich]'
 ```
 
 ### Running Tests

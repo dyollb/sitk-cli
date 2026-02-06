@@ -37,6 +37,9 @@ dev = [
     "pytest",
     "ruff",
 ]
+rich = [
+    "rich",
+]
 
 [project.urls]
 Homepage = "https://github.com/dyollb/sitk-cli"
