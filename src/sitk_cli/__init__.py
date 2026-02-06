@@ -24,5 +24,5 @@ logger.setLevel(logging.WARNING)  # Default: quiet
 logger.addHandler(_handler)
 logger.propagate = False  # Don't propagate to root logger
 
-__version__: Final = "0.7.0"
+__version__: Final = "0.8.0"
 __all__ = ("__version__", "logger", "make_cli", "register_command")
