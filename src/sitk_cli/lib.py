@@ -4,11 +4,13 @@ import logging
 from collections.abc import Callable
 from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Any, Literal, TypeAlias, get_args, get_origin
+from typing import Any, Literal, TypeAlias
 
 import SimpleITK as sitk
 import typer
 from makefun import wraps
+
+from .utils import is_typer_default, parse_annotation
 
 # Type aliases
 SitkImageOrTransform: TypeAlias = type[sitk.Image] | type[sitk.Transform]
@@ -77,27 +79,6 @@ def make_cli(
         False  # Track if we see any Image/Transform inputs at all
     )
 
-    def _parse_annotation(annotation: Any) -> Any:
-        """Parse type annotation, handling Optional/Union and string annotations.
-
-        String annotations need evaluation to convert to actual types. This is
-        necessary when annotations reference types not yet defined at parse time.
-        """
-        if isinstance(annotation, str):
-            try:
-                annotation = eval(annotation, globals, locals)
-            except Exception as e:
-                msg = f"Failed to parse type annotation '{annotation}': {e}"
-                raise ValueError(msg) from e
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-        if origin is not None:
-            for a in args:
-                if a is not type(None):
-                    return a
-        return annotation
-
     def _translate_param(p: Parameter) -> Parameter:
         """Translate function parameters for CLI compatibility.
 
@@ -107,7 +88,7 @@ def make_cli(
         Respects Python's keyword-only parameters (after *,).
         """
         nonlocal has_positional_input, has_any_image_transform_input
-        annotation = _parse_annotation(p.annotation)
+        annotation = parse_annotation(p.annotation, globals, locals)
         default = p.default
         is_keyword_only = p.kind == Parameter.KEYWORD_ONLY
 
@@ -149,7 +130,7 @@ def make_cli(
     for p in func_sig.parameters.values():
         params.append(_translate_param(p))
 
-    return_type = _parse_annotation(func_sig.return_annotation)
+    return_type = parse_annotation(func_sig.return_annotation, globals, locals)
     if (
         return_type
         and isclass(return_type)
@@ -229,7 +210,7 @@ def make_cli(
                 continue
             if k == "_force":
                 # Extract boolean value from typer.Option if needed
-                force = bool(v.default if isinstance(v, typer.models.OptionInfo) else v)
+                force = bool(v.default if is_typer_default(v) else v)
                 continue
             if k in image_args and isinstance(v, Path):
                 if not v.exists():

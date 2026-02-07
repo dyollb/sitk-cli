@@ -2,47 +2,28 @@
 
 from __future__ import annotations
 
-import types
 from collections import defaultdict
 from inspect import Parameter, signature
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Union, get_type_hints
+from typing import TYPE_CHECKING, Any, Final
 
 import SimpleITK as sitk
 import typer
 from makefun import wraps
 
+from .utils import (
+    find_image_transform_params,
+    get_default_glob,
+    get_stem_and_suffix,
+    is_typer_default,
+    parse_annotation,
+    resolve_type_hints,
+)
+
 if TYPE_CHECKING:
     from .lib import FuncType
 
 _OUTPUT_DIR_ARG: Final = typer.Argument(..., help="Output directory")
-
-
-def _get_stem_and_suffix(path: Path) -> tuple[str, str]:
-    """Get stem and suffix handling multi-part extensions like .nii.gz.
-
-    Args:
-        path: File path to parse
-
-    Returns:
-        Tuple of (stem, suffix) where suffix includes all extensions
-
-    Examples:
-        brain.nii.gz -> ('brain', '.nii.gz')
-        image.nii -> ('image', '.nii')
-        data.tar.gz -> ('data', '.tar.gz')
-    """
-    suffix = "".join(path.suffixes)
-    stem = path.name.removesuffix(suffix)
-    return stem, suffix
-
-
-def _get_default_glob(param_type: type) -> str:
-    """Get default glob pattern for Image or Transform types."""
-    if issubclass(param_type, sitk.Transform):
-        return "*.tfm"
-    # Default for Image
-    return "*.nii.gz"
 
 
 def create_batch_command(
@@ -77,54 +58,18 @@ def create_batch_command(
         >>> # Uses fixed.nii for all, globs movings_dir/*.nii.gz
     """
     func_sig = signature(func)
+    type_hints = resolve_type_hints(func)
+    image_transform_params, optional_params = find_image_transform_params(
+        func_sig, type_hints
+    )
 
-    # Get type hints (handles "from __future__ import annotations")
-    try:
-        type_hints = get_type_hints(func)
-    except Exception:
-        # Fallback if get_type_hints fails
-        type_hints = {}
-
-    # Find Image/Transform parameters and track optional ones
-    image_transform_params: dict[str, type] = {}
-    optional_params: set[str] = set()
-
-    for param_name, param in func_sig.parameters.items():
-        annotation = type_hints.get(param_name)
-        if annotation is None:
-            continue
-
-        # Check if parameter has a default value (is optional)
-        param_is_optional = param.default is not param.empty
-
-        # Handle Union types (e.g., Image | None)
-        # Python 3.10+: types.UnionType (from X | Y syntax)
-        # Python 3.9-: typing.Union (from Union[X, Y] syntax)
-        origin = getattr(annotation, "__origin__", None)
-        is_union = origin is Union or isinstance(annotation, types.UnionType)
-
-        if is_union:
-            # Extract non-None types from Union
-            args = getattr(annotation, "__args__", ())
-            non_none_types = [t for t in args if t is not type(None)]
-            if len(non_none_types) == 1:
-                annotation = non_none_types[0]
-                param_is_optional = True  # Union with None means optional
-
-        # Check if annotation is Image or Transform class
-        if annotation is sitk.Image or annotation is sitk.Transform:
-            image_transform_params[param_name] = annotation
-            if param_is_optional:
-                optional_params.add(param_name)
-        elif isinstance(annotation, type):
-            try:
-                if issubclass(annotation, (sitk.Image, sitk.Transform)):
-                    image_transform_params[param_name] = annotation
-                    if param_is_optional:
-                        optional_params.add(param_name)
-            except TypeError:
-                # Handle cases where issubclass fails
-                pass
+    # Check if function returns Image or Transform (needs output_dir)
+    return_type = parse_annotation(func_sig.return_annotation)
+    needs_output = (
+        return_type is not None
+        and isinstance(return_type, type)
+        and issubclass(return_type, (sitk.Image, sitk.Transform))
+    )
 
     # Determine which parameter drives output naming
     if output_stem is None:
@@ -151,7 +96,7 @@ def create_batch_command(
         if param_name in image_transform_params:
             # Image/Transform → Path argument with help text
             param_type = image_transform_params[param_name]
-            glob_pattern = _get_default_glob(param_type)
+            glob_pattern = get_default_glob(param_type)
 
             # Build help text
             if param_name in optional_params:
@@ -176,28 +121,30 @@ def create_batch_command(
             # Keep other positional/keyword parameters
             positional_params.append(param)
 
-    # Add output_dir parameter (positional/keyword)
-    positional_params.append(
-        Parameter(
-            "output_dir",
-            Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Path,
-            default=_OUTPUT_DIR_ARG,
+    # Add output_dir and output_template only if function returns Image/Transform
+    if needs_output:
+        # Add output_dir parameter (positional/keyword)
+        positional_params.append(
+            Parameter(
+                "output_dir",
+                Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Path,
+                default=_OUTPUT_DIR_ARG,
+            )
         )
-    )
 
-    # Add output_template as optional keyword-only parameter
-    keyword_only_params.append(
-        Parameter(
-            "output_template",
-            Parameter.KEYWORD_ONLY,
-            annotation=str,
-            default=typer.Option(
-                output_template,
-                help=f"Output filename template. Variables: {{stem}}, {{suffix}}, {{name}}. Default: {output_template}",
-            ),
+        # Add output_template as optional keyword-only parameter
+        keyword_only_params.append(
+            Parameter(
+                "output_template",
+                Parameter.KEYWORD_ONLY,
+                annotation=str,
+                default=typer.Option(
+                    output_template,
+                    help=f"Output filename template. Variables: {{stem}}, {{suffix}}, {{name}}. Default: {output_template}",
+                ),
+            )
         )
-    )
 
     # Combine parameters in correct order: positional/keyword, then keyword-only
     new_params = positional_params + keyword_only_params
@@ -207,15 +154,21 @@ def create_batch_command(
     @wraps(func, new_sig=new_sig)  # type: ignore[misc,untyped-decorator]
     def batch_wrapper(*args: Any, **kwargs: Any) -> None:
         """Process multiple files in batch."""
-        # Extract output_dir and output_template from kwargs
-        output_dir: Path = kwargs.pop("output_dir")
-        template_arg = kwargs.pop("output_template")
+        # Extract output_dir and output_template from kwargs (if function returns Image/Transform)
+        output_dir: Path | None
+        template: str | None
+        if needs_output:
+            output_dir = kwargs.pop("output_dir")
+            template_arg = kwargs.pop("output_template")
 
-        # Handle typer.Option default values (OptionInfo objects)
-        if isinstance(template_arg, typer.models.OptionInfo):
-            template: str = output_template  # Use default from create_batch_command
+            # Handle typer.Option default values (OptionInfo objects)
+            if is_typer_default(template_arg):
+                template = output_template  # Use default from create_batch_command
+            else:
+                template = template_arg  # Use runtime override
         else:
-            template = template_arg  # Use runtime override
+            output_dir = None
+            template = None
 
         # Build arg_map from both args and kwargs
         param_names = list(func_sig.parameters.keys())
@@ -245,7 +198,7 @@ def create_batch_command(
 
             # Handle optional parameters: typer.Argument(None) becomes ArgumentInfo object
             # when not provided, treat as None
-            if isinstance(path, typer.models.ArgumentInfo):
+            if is_typer_default(path):
                 continue
 
             if path.is_file():
@@ -253,7 +206,7 @@ def create_batch_command(
                 single_files[param_name] = path
             elif path.is_dir():
                 # Directory - glob for files
-                glob_pattern = _get_default_glob(param_type)
+                glob_pattern = get_default_glob(param_type)
                 files = sorted(path.glob(glob_pattern))
                 if not files:
                     print(f"Warning: No files found matching {path}/{glob_pattern}")
@@ -269,7 +222,7 @@ def create_batch_command(
 
             for param_name, files in dir_files.items():
                 for file_path in files:
-                    stem, _ = _get_stem_and_suffix(file_path)
+                    stem, _ = get_stem_and_suffix(file_path)
                     stem_to_files[stem][param_name] = file_path
 
             # Filter to complete matches
@@ -295,8 +248,10 @@ def create_batch_command(
             # Process once with the single files
             complete_matches = {"single": {}}
 
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Create output directory (if needed)
+        if needs_output:
+            assert output_dir is not None  # nosec
+            output_dir.mkdir(parents=True, exist_ok=True)
 
         # Process each matched set
         total = len(complete_matches)
@@ -304,17 +259,21 @@ def create_batch_command(
             # Combine single files with matched directory files
             all_files = {**single_files, **matched_files}
 
-            # Get template variables from output_stem file
-            output_file_ref = all_files[output_stem]
-            _, suffix = _get_stem_and_suffix(output_file_ref)
+            # Prepare output path (if needed)
+            if needs_output:
+                assert template is not None  # nosec
+                assert output_dir is not None  # nosec
+                # Get template variables from output_stem file
+                output_file_ref = all_files[output_stem]
+                _, suffix = get_stem_and_suffix(output_file_ref)
 
-            # Format output filename
-            output_name = template.format(
-                stem=stem,
-                suffix=suffix,
-                name=output_file_ref.name,
-            )
-            output_path = output_dir / output_name
+                # Format output filename
+                output_name = template.format(
+                    stem=stem,
+                    suffix=suffix,
+                    name=output_file_ref.name,
+                )
+                output_path = output_dir / output_name
 
             print(f"[{idx}/{total}] Processing {stem}...")
 
@@ -333,8 +292,8 @@ def create_batch_command(
             # Execute function
             result = func(**func_args)
 
-            # Save result
-            if result is not None:
+            # Save result (if function returns Image/Transform)
+            if needs_output and result is not None:
                 if isinstance(result, sitk.Image):
                     sitk.WriteImage(result, str(output_path))
                 elif isinstance(result, sitk.Transform):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from inspect import signature
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -331,3 +332,32 @@ def test_batch_stem_extraction_multi_part_extensions(tmp_path: Path) -> None:
     output_files = list(output_dir.glob("*"))
     assert len(output_files) == 1
     assert output_files[0].name == "image.nii.gz"
+
+
+def test_batch_output_params_added_when_function_returns_image() -> None:
+    """Test that output_dir and output_template are added when function returns Image."""
+
+    def filter_image(input: sitk.Image) -> sitk.Image:
+        return input
+
+    batch_fn = create_batch_command(filter_image)
+    sig = signature(batch_fn)
+
+    # Check that output_dir and output_template are in the signature
+    assert "output_dir" in sig.parameters
+    assert "output_template" in sig.parameters
+
+
+def test_batch_output_params_not_added_when_function_returns_none() -> None:
+    """Test that output_dir and output_template are NOT added when function returns None."""
+
+    def analyze_image(input: sitk.Image) -> None:
+        """Analysis function that doesn't return anything."""
+        pass
+
+    batch_fn = create_batch_command(analyze_image)
+    sig = signature(batch_fn)
+
+    # Check that output_dir and output_template are NOT in the signature
+    assert "output_dir" not in sig.parameters
+    assert "output_template" not in sig.parameters
