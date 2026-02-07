@@ -2,7 +2,6 @@ import logging
 import sys
 from typing import Final
 
-from .batch import create_batch_command
 from .lib import make_cli, register_command
 
 # Try to use Rich if available, otherwise fall back to standard logging
@@ -25,10 +24,9 @@ logger.setLevel(logging.WARNING)  # Default: quiet
 logger.addHandler(_handler)
 logger.propagate = False  # Don't propagate to root logger
 
-__version__: Final = "0.8.0"
+__version__: Final = "0.8.1"
 __all__ = (
     "__version__",
-    "create_batch_command",
     "logger",
     "make_cli",
     "register_command",

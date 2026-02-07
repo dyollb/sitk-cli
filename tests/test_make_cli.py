@@ -129,3 +129,85 @@ def test_no_auto_create_directories_when_disabled(tmp_path: Path) -> None:
     # Should raise RuntimeError from SimpleITK when trying to write to non-existent directory
     with pytest.raises(RuntimeError, match="failed to write image"):
         make_image_cli(width=64, height=64, output=nested_output)
+
+
+def test_make_cli_batch_mode(tmp_path: Path) -> None:
+    """Test make_cli with batch=True creates a batch command."""
+
+    def invert(input: sitk.Image) -> sitk.Image:
+        return sitk.InvertIntensity(input)
+
+    # Create batch command using make_cli
+    batch_cli = sitk_cli.make_cli(invert, batch=True)
+
+    # Create test images
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    for i in range(3):
+        img = sitk.Image(10, 10, sitk.sitkUInt8)
+        img[:] = i * 50
+        sitk.WriteImage(img, str(input_dir / f"image_{i}.nii.gz"))
+
+    # Run batch processing - params match original function signature
+    output_dir = tmp_path / "outputs"
+    batch_cli(input=input_dir, output_dir=output_dir)
+
+    # Verify all outputs were created
+    assert (output_dir / "image_0.nii.gz").exists()
+    assert (output_dir / "image_1.nii.gz").exists()
+    assert (output_dir / "image_2.nii.gz").exists()
+
+
+def test_make_cli_batch_mode_with_template(tmp_path: Path) -> None:
+    """Test make_cli batch mode with custom output template."""
+
+    def threshold(input: sitk.Image, *, value: int) -> sitk.Image:
+        return sitk.BinaryThreshold(input, lowerThreshold=value)
+
+    # Create batch command with custom template
+    batch_cli = sitk_cli.make_cli(
+        threshold, batch=True, output_template="thresh_{stem}.nii.gz"
+    )
+
+    # Create test images
+    input_dir = tmp_path / "inputs"
+    input_dir.mkdir()
+    img = sitk.Image(10, 10, sitk.sitkUInt8)
+    img[:] = 100
+    sitk.WriteImage(img, str(input_dir / "original.nii.gz"))
+
+    # Run batch processing - params match original function signature
+    output_dir = tmp_path / "outputs"
+    batch_cli(input=input_dir, output_dir=output_dir, value=50)
+
+    # Verify output has custom name
+    assert (output_dir / "thresh_original.nii.gz").exists()
+    assert not (output_dir / "original.nii.gz").exists()
+
+
+def test_make_cli_batch_mode_transform(tmp_path: Path) -> None:
+    """Test make_cli batch mode with transforms."""
+
+    def scale_transform(tx: sitk.Transform, *, factor: float) -> sitk.Transform:
+        # Create a simple scaling transform based on input
+        result = sitk.ScaleTransform(2)  # 2D scale
+        result.SetScale([factor, factor])
+        return result
+
+    batch_cli = sitk_cli.make_cli(scale_transform, batch=True)
+
+    # Create test transforms
+    input_dir = tmp_path / "transforms"
+    input_dir.mkdir()
+    for i in range(2):
+        tx = sitk.TranslationTransform(2)
+        tx.SetOffset([i * 10, i * 20])
+        sitk.WriteTransform(tx, str(input_dir / f"tx_{i}.tfm"))
+
+    # Run batch processing - params match original function signature
+    output_dir = tmp_path / "outputs"
+    batch_cli(tx=input_dir, output_dir=output_dir, factor=2.0)
+
+    # Verify outputs
+    assert (output_dir / "tx_0.tfm").exists()
+    assert (output_dir / "tx_1.tfm").exists()

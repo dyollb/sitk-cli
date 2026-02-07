@@ -1,4 +1,4 @@
-"""Shared utilities for sitk-cli introspection and type handling."""
+"""Type introspection utilities for sitk-cli."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import typer
 
 if TYPE_CHECKING:
     from inspect import Signature
-    from pathlib import Path
 
 
 def resolve_type_hints(func: Any) -> dict[str, Any]:
@@ -139,37 +138,3 @@ def is_typer_default(value: Any) -> bool:
         True if value is a typer OptionInfo or ArgumentInfo object
     """
     return isinstance(value, (typer.models.OptionInfo, typer.models.ArgumentInfo))
-
-
-def get_stem_and_suffix(path: Path) -> tuple[str, str]:
-    """Get stem and suffix handling multi-part extensions like .nii.gz.
-
-    Args:
-        path: File path to parse
-
-    Returns:
-        Tuple of (stem, suffix) where suffix includes all extensions
-
-    Examples:
-        brain.nii.gz -> ('brain', '.nii.gz')
-        image.nii -> ('image', '.nii')
-        data.tar.gz -> ('data', '.tar.gz')
-    """
-    suffix = "".join(path.suffixes)
-    stem = path.name.removesuffix(suffix)
-    return stem, suffix
-
-
-def get_default_glob(param_type: type) -> str:
-    """Get default glob pattern for Image or Transform types.
-
-    Args:
-        param_type: SimpleITK Image or Transform type
-
-    Returns:
-        Glob pattern string
-    """
-    if issubclass(param_type, sitk.Transform):
-        return "*.tfm"
-    # Default for Image
-    return "*.nii.gz"

@@ -1,7 +1,7 @@
 """Example: Batch processing with sitk-cli.
 
-This example demonstrates how to use create_batch_command() to process
-multiple files in directories.
+This example demonstrates how to use make_cli(batch=True) and
+register_command(batch=True) to process multiple files in directories.
 
 Features demonstrated:
 - Single input directory → multiple outputs
@@ -14,7 +14,7 @@ Features demonstrated:
 import SimpleITK as sitk
 import typer
 
-from sitk_cli import create_batch_command
+from sitk_cli import register_command
 
 app = typer.Typer(pretty_exceptions_enable=False)
 
@@ -23,14 +23,11 @@ app = typer.Typer(pretty_exceptions_enable=False)
 #
 
 
+@register_command(app, func_name="median", batch=True)
 def median_filter(input: sitk.Image, radius: int = 2) -> sitk.Image:
     """Apply median filter to reduce noise."""
     return sitk.Median(input, [radius] * input.GetDimension())
 
-
-# Create batch version - processes all *.nii.gz files in input directory
-batch_median = create_batch_command(median_filter)
-app.command(name="median")(batch_median)
 
 # CLI Usage:
 # python examples/batch_processing.py median input_dir/ output_dir/ --radius 3
@@ -43,13 +40,11 @@ app.command(name="median")(batch_median)
 #
 
 
+@register_command(app, func_name="smooth", batch=True)
 def smooth(input: sitk.Image, sigma: float = 1.0) -> sitk.Image:
     """Apply Gaussian smoothing."""
     return sitk.SmoothingRecursiveGaussian(input, sigma)
 
-
-batch_smooth = create_batch_command(smooth)
-app.command(name="smooth")(batch_smooth)
 
 # CLI Usage: Works seamlessly with BIDS naming
 # python examples/batch_processing.py smooth bids_dir/ smoothed/ --sigma 2.0
@@ -62,16 +57,16 @@ app.command(name="smooth")(batch_smooth)
 #
 
 
+@register_command(
+    app,
+    func_name="threshold",
+    batch=True,
+    output_template="thresholded_{stem}{suffix}",
+)
 def threshold(input: sitk.Image, value: int = 128) -> sitk.Image:
     """Apply binary threshold."""
     return sitk.BinaryThreshold(input, lowerThreshold=value)
 
-
-# Custom output template with prefix
-batch_threshold = create_batch_command(
-    threshold, output_template="thresholded_{stem}{suffix}"
-)
-app.command(name="threshold")(batch_threshold)
 
 # CLI Usage:
 # python examples/batch_processing.py threshold scans/ outputs/ --value 100
@@ -83,14 +78,11 @@ app.command(name="threshold")(batch_threshold)
 #
 
 
+@register_command(app, func_name="resample", batch=True)
 def apply_transform(image: sitk.Image, transform: sitk.Transform) -> sitk.Image:
     """Apply transform to image."""
     return sitk.Resample(image, transform)
 
-
-# Processes matching pairs from two directories
-batch_resample = create_batch_command(apply_transform)
-app.command(name="resample")(batch_resample)
 
 # CLI Usage:
 # python examples/batch_processing.py resample images/ transforms/ outputs/
@@ -103,6 +95,15 @@ app.command(name="resample")(batch_resample)
 #
 
 
+# Register multiple subjects to a single template
+# Outputs are transforms named after the fixed images
+@register_command(
+    app,
+    func_name="register-multi",
+    batch=True,
+    output_template="{stem}.tfm",
+    output_stem="fixed",
+)
 def register_fixed_to_moving(
     fixed: sitk.Image,
     moving: sitk.Image,
@@ -134,15 +135,6 @@ def register_fixed_to_moving(
     return registration.Execute(fixed, moving)
 
 
-# Register multiple subjects to a single template
-# Outputs are transforms named after the fixed images
-batch_register_multi = create_batch_command(
-    register_fixed_to_moving,
-    output_template="{stem}.tfm",
-    output_stem="fixed",
-)
-app.command(name="register-multi")(batch_register_multi)
-
 # CLI Usage (without mask):
 # python examples/batch_processing.py register-multi \
 #     subjects/ template.nii.gz transforms/
@@ -152,7 +144,7 @@ app.command(name="register-multi")(batch_register_multi)
 #
 # CLI Usage (with masks matching subjects):
 # python examples/batch_processing.py register-multi \
-#     subjects/ template.nii.gz masks/ transforms/
+#     subjects/ template.nii.gz transforms/ --fixed-mask masks/
 # Matches masks by stem:
 #   subjects/sub-01.nii.gz + masks/sub-01.nii.gz + template.nii.gz → transforms/sub-01.tfm
 #   subjects/sub-02.nii.gz + masks/sub-02.nii.gz + template.nii.gz → transforms/sub-02.tfm
@@ -162,6 +154,9 @@ app.command(name="register-multi")(batch_register_multi)
 #
 
 
+# Use single atlas file for all moving images
+# Specify output_stem="moving" to name outputs after moving images
+@register_command(app, func_name="register-atlas", batch=True, output_stem="moving")
 def register_to_atlas(
     moving: sitk.Image,
     fixed: sitk.Image,
@@ -196,11 +191,6 @@ def register_to_atlas(
     )
 
 
-# Use single atlas file for all moving images
-# Specify output_stem="moving" to name outputs after moving images
-batch_register = create_batch_command(register_to_atlas, output_stem="moving")
-app.command(name="register-atlas")(batch_register)
-
 # CLI Usage:
 # python examples/batch_processing.py register-atlas \
 #     subjects/ atlas.nii.gz outputs/ --iterations 200
@@ -213,6 +203,14 @@ app.command(name="register-atlas")(batch_register)
 #
 
 
+# Output .tfm files instead of images
+@register_command(
+    app,
+    func_name="motion",
+    batch=True,
+    output_template="{stem}.tfm",
+    output_stem="moving",
+)
 def estimate_motion(fixed: sitk.Image, moving: sitk.Image) -> sitk.Transform:
     """Estimate motion between two images."""
     # Simplified rigid registration
@@ -225,14 +223,6 @@ def estimate_motion(fixed: sitk.Image, moving: sitk.Image) -> sitk.Transform:
 
     return registration.Execute(fixed, moving)
 
-
-# Output .tfm files instead of images
-batch_motion = create_batch_command(
-    estimate_motion,
-    output_template="{stem}.tfm",
-    output_stem="moving",
-)
-app.command(name="motion")(batch_motion)
 
 # CLI Usage:
 # python examples/batch_processing.py motion \

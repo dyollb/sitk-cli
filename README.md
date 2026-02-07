@@ -12,12 +12,11 @@ Create [Typer](https://github.com/tiangolo/typer) command line interfaces from f
 **Key features:**
 
 - 🔄 Automatic file I/O handling for SimpleITK images and transforms
-- 🎯 Type-safe with full type annotation support
 - 🚀 Built on Typer for modern CLI experiences
-- 🐍 Pythonic CLI design using native `*,` syntax for keyword-only parameters
 - 📁 Auto-create output directories with optional overwrite protection
 - 📝 Optional verbose logging with Rich integration
-- 🐍 Python 3.11+ with modern syntax
+- � Batch processing for entire directories with automatic file matching
+- �🐍 Python 3.11+ with modern syntax
 
 ## Installation
 
@@ -126,17 +125,41 @@ python script.py protected-process input.nii output.nii --force  # OK, overwrite
 
 Modes: `overwrite=True` (default), `overwrite=False` (requires `--force`), `overwrite="prompt"` (asks user)
 
-Optional parameters with defaults automatically become named options:
+### Batch Processing
+
+Process entire directories of images/transforms with automatic file matching:
 
 ```python
-@register_command(app)
-def median_filter(input: sitk.Image, radius: int = 2) -> sitk.Image:
-    """Apply median filtering to an image.
+from sitk_cli import register_command
+import typer
 
-    CLI: median-filter INPUT OUTPUT [--radius 3]
-    """
+app = typer.Typer()
+
+@register_command(app, batch=True)
+def denoise(input: sitk.Image, radius: int = 2) -> sitk.Image:
+    """Apply median filter to reduce noise."""
     return sitk.Median(input, [radius] * input.GetDimension())
+
+@register_command(app, batch=True)
+def smooth(input: sitk.Image, sigma: float = 1.0) -> sitk.Image:
+    """Apply Gaussian smoothing."""
+    return sitk.SmoothingRecursiveGaussian(input, sigma)
 ```
+
+```sh
+# Process directory
+python script.py denoise input/ outputs/ --radius 3
+
+# Mix directory and single file (e.g., registration with fixed reference)
+python script.py register fixed.nii movings/ outputs/
+```
+
+**Features:**
+
+- 🔍 Auto-detects files vs directories (globs `*.nii.gz` or `*.tfm`)
+- 🔗 Matches files across directories by stem (e.g., `brain_001.nii.gz` ↔ `brain_001_mask.nii.gz`)
+- 📝 Customizable output naming with `output_template='processed_{stem}{suffix}'`
+- ✅ Supports optional parameters (e.g., optional mask)
 
 ## Demo
 
