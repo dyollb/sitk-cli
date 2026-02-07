@@ -203,7 +203,7 @@ def create_batch_wrapper(
 
             if not complete_matches:
                 print("Error: No matching files found")
-                return
+                raise typer.Exit(code=1)
         else:
             complete_matches = {"single": {}}
 
