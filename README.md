@@ -15,8 +15,8 @@ Create [Typer](https://github.com/tiangolo/typer) command line interfaces from f
 - 🚀 Built on Typer for modern CLI experiences
 - 📁 Auto-create output directories with optional overwrite protection
 - 📝 Optional verbose logging with Rich integration
-- � Batch processing for entire directories with automatic file matching
-- �🐍 Python 3.11+ with modern syntax
+- Batch processing for entire directories with automatic file matching
+- 🐍 Python 3.11+ with modern syntax
 
 ## Installation
 
