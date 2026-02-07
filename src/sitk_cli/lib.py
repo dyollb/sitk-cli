@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal, TypeAlias
@@ -72,7 +73,7 @@ def _save_sitk_file(
         sitk.WriteTransform(obj, str(output_file))
 
 
-def make_cli(
+def create_command(
     func: FuncType,
     batch: bool = False,
     output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
@@ -84,7 +85,7 @@ def make_cli(
     globals: dict[str, Any] | None = None,
     locals: dict[str, Any] | None = None,
 ) -> FuncType:
-    """Make command line interface from function with sitk.Image args.
+    """Create command line interface from function with sitk.Image args.
 
     Transforms a function that uses SimpleITK Image/Transform objects into a CLI
     that accepts file paths. Automatically handles loading from and saving to files.
@@ -128,16 +129,16 @@ def make_cli(
         Single-file mode:
         >>> def process(input: sitk.Image) -> sitk.Image:
         ...     return input
-        >>> cli = make_cli(process)
+        >>> cli = create_command(process)
         # CLI: process INPUT OUTPUT
 
         Batch mode:
-        >>> cli_batch = make_cli(process, batch=True)
+        >>> cli_batch = create_command(process, batch=True)
         # CLI: process INPUT_DIR/ OUTPUT_DIR/
 
         >>> def process(input: sitk.Image, *, mask: sitk.Image) -> sitk.Image:
         ...     return input * mask
-        >>> cli = make_cli(process)
+        >>> cli = create_command(process)
         # CLI: process INPUT OUTPUT --mask MASK
     """
     # Build CLI signature using parameters module
@@ -214,6 +215,42 @@ def make_cli(
     return func_wrapper
 
 
+def make_cli(
+    func: FuncType,
+    batch: bool = False,
+    output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
+    output_template: str = "{stem}{suffix}",
+    output_stem: str | None = None,
+    create_dirs: bool = True,
+    verbose: bool = False,
+    overwrite: bool | Literal["prompt"] = True,
+    globals: dict[str, Any] | None = None,
+    locals: dict[str, Any] | None = None,
+) -> FuncType:
+    """Deprecated: Use create_command instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use create_command() instead.
+    """
+    warnings.warn(
+        "make_cli() is deprecated, use create_command() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return create_command(
+        func=func,
+        batch=batch,
+        output_arg_name=output_arg_name,
+        output_template=output_template,
+        output_stem=output_stem,
+        create_dirs=create_dirs,
+        verbose=verbose,
+        overwrite=overwrite,
+        globals=globals,
+        locals=locals,
+    )
+
+
 def register_command(
     app: typer.Typer,
     func_name: str | None = None,
@@ -229,7 +266,7 @@ def register_command(
 ) -> DecoratorType:
     """Register a function as a Typer command.
 
-    Decorator that wraps a function with make_cli and registers it with a Typer app.
+    Decorator that wraps a function with create_command and registers it with a Typer app.
 
     Args:
         app: Typer application instance to register the command with
@@ -270,7 +307,7 @@ def register_command(
     """
 
     def decorator(func: FuncType) -> FuncType:
-        func_cli = make_cli(
+        func_cli = create_command(
             func,
             batch=batch,
             output_arg_name=output_arg_name,

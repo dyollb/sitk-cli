@@ -8,7 +8,7 @@ from typing import Final
 VERBOSE_PARAM_NAME: Final = "_verbose"
 FORCE_PARAM_NAME: Final = "_force"
 
-# Default values for make_cli/register_command
+# Default values for create_command/register_command
 DEFAULT_OUTPUT_ARG_NAME: Final = "output"
 DEFAULT_OUTPUT_TEMPLATE: Final = "{stem}{suffix}"
 
