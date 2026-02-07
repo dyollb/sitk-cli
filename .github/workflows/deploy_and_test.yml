@@ -42,6 +42,11 @@ jobs:
           os: ubuntu-22.04,
           python-version: "3.13"
           }
+        - {
+          name: "ubuntu-22.04 - Python 3.14",
+          os: ubuntu-22.04,
+          python-version: "3.14"
+          }
 
     steps:
     - name: Checkout
@@ -64,7 +69,7 @@ jobs:
         ruff format --check .
     - name: Type check with mypy
       working-directory: src_dir
-      run: mypy src/sitk_cli
+      run: mypy src
     - name: Test with pytest
       working-directory: src_dir
       run: pytest tests --cov --cov-report=xml
