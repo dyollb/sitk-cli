@@ -26,7 +26,7 @@ def get_option_default(p: Parameter) -> Any:
 
 def test_optional_argument() -> None:
     """Test optional arguments with keyword-only inputs."""
-    cli = sitk_cli.make_cli(select_image)
+    cli = sitk_cli.create_command(select_image)
     sig = signature(cli)
 
     assert len(sig.parameters) == 3
@@ -42,7 +42,7 @@ def test_optional_argument() -> None:
 
 def _test_optional_return_type() -> None:
     """Test optional return type with keyword-only inputs."""
-    cli = sitk_cli.make_cli(pass_image)
+    cli = sitk_cli.create_command(pass_image)
     sig = signature(cli)
 
     assert len(sig.parameters) == 3

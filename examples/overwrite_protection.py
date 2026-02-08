@@ -1,7 +1,7 @@
 """Demonstrates overwrite protection modes for output files.
 
 This example shows how to control output file overwrite behavior using the
-`overwrite` parameter in make_cli() and register_command().
+`overwrite` parameter in create_command() and register_command().
 
 Three modes are available:
 - True: Always overwrite without asking

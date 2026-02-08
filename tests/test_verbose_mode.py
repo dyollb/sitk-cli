@@ -20,7 +20,7 @@ def process_image(input: sitk.Image) -> sitk.Image:
 
 def test_verbose_mode_adds_parameter() -> None:
     """Test that verbose=True adds _verbose parameter."""
-    cli = sitk_cli.make_cli(process_image, verbose=True)
+    cli = sitk_cli.create_command(process_image, verbose=True)
     sig = signature(cli)
 
     # Should have input, output, and _verbose parameters
@@ -36,7 +36,7 @@ def test_verbose_mode_adds_parameter() -> None:
 
 def test_verbose_mode_disabled_by_default() -> None:
     """Test that verbose mode is disabled by default."""
-    cli = sitk_cli.make_cli(process_image, verbose=False)
+    cli = sitk_cli.create_command(process_image, verbose=False)
     sig = signature(cli)
 
     # Should NOT have _verbose parameter

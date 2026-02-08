@@ -1,6 +1,6 @@
 """Example: Batch processing with sitk-cli.
 
-This example demonstrates how to use make_cli(batch=True) and
+This example demonstrates how to use create_command(batch=True) and
 register_command(batch=True) to process multiple files in directories.
 
 Features demonstrated:

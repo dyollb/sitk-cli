@@ -3,7 +3,7 @@ from __future__ import annotations
 import SimpleITK as sitk
 import typer
 
-from sitk_cli import make_cli
+from sitk_cli import create_command
 
 
 def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
@@ -16,4 +16,4 @@ def fill_holes_slice_by_slice(mask: sitk.Image) -> sitk.Image:
 
 
 if __name__ == "__main__":
-    typer.run(make_cli(fill_holes_slice_by_slice))
+    typer.run(create_command(fill_holes_slice_by_slice))

@@ -28,16 +28,16 @@ def select_image(input1: sitk.Image, input2: sitk.Image | None) -> sitk.Image:
     return input1 if input2 is None else input2
 
 
-def test_make_cli_image_arg() -> None:
-    cli = sitk_cli.make_cli(get_shape)
+def test_create_command_image_arg() -> None:
+    cli = sitk_cli.create_command(get_shape)
     sig = signature(cli)
 
     assert len(sig.parameters) == 1
     assert issubclass(sig.parameters["input"].annotation, Path)
 
 
-def test_make_cli_image_return() -> None:
-    cli = sitk_cli.make_cli(make_image)
+def test_create_command_image_return() -> None:
+    cli = sitk_cli.create_command(make_image)
     sig = signature(cli)
 
     assert len(sig.parameters) == 3
@@ -46,9 +46,9 @@ def test_make_cli_image_return() -> None:
     assert issubclass(sig.parameters["output"].annotation, Path)
 
 
-def test_make_cli_usage(tmp_path: Path) -> None:
-    make_image_cli = sitk_cli.make_cli(make_image)
-    get_width_cli = sitk_cli.make_cli(get_shape)
+def test_create_command_usage(tmp_path: Path) -> None:
+    make_image_cli = sitk_cli.create_command(make_image)
+    get_width_cli = sitk_cli.create_command(get_shape)
 
     tmp_file = tmp_path / "image.nii.gz"
     make_image_cli(width=32, height=64, output=tmp_file)
@@ -59,8 +59,8 @@ def test_make_cli_usage(tmp_path: Path) -> None:
     make_image_cli(width=32, height=64, output=None)
 
 
-def test_make_cli_transform_arg() -> None:
-    cli = sitk_cli.make_cli(register_api, output_arg_name="output_transform")
+def test_create_command_transform_arg() -> None:
+    cli = sitk_cli.create_command(register_api, output_arg_name="output_transform")
     sig = signature(cli)
 
     assert len(sig.parameters) == 4
@@ -71,7 +71,7 @@ def test_make_cli_transform_arg() -> None:
 
 
 def test_optional_argument() -> None:
-    cli = sitk_cli.make_cli(select_image)
+    cli = sitk_cli.create_command(select_image)
     sig = signature(cli)
 
     assert len(sig.parameters) == 3
@@ -82,7 +82,7 @@ def test_optional_argument() -> None:
 
 def test_file_not_found_error_for_image(tmp_path: Path) -> None:
     """Test that FileNotFoundError is raised when input image file doesn't exist."""
-    get_shape_cli = sitk_cli.make_cli(get_shape)
+    get_shape_cli = sitk_cli.create_command(get_shape)
     nonexistent_file = tmp_path / "does_not_exist.nii.gz"
 
     with pytest.raises(FileNotFoundError, match="Input image file not found"):
@@ -96,7 +96,7 @@ def test_file_not_found_error_for_transform(tmp_path: Path) -> None:
     def process_transform(tx: sitk.Transform) -> sitk.Transform:
         return tx
 
-    process_cli = sitk_cli.make_cli(process_transform)
+    process_cli = sitk_cli.create_command(process_transform)
     nonexistent_file = tmp_path / "does_not_exist.tfm"
 
     with pytest.raises(FileNotFoundError, match="Input transform file not found"):
@@ -105,7 +105,7 @@ def test_file_not_found_error_for_transform(tmp_path: Path) -> None:
 
 def test_auto_create_output_directories(tmp_path: Path) -> None:
     """Test that output directories are created automatically when create_dirs=True."""
-    make_image_cli = sitk_cli.make_cli(make_image, create_dirs=True)
+    make_image_cli = sitk_cli.create_command(make_image, create_dirs=True)
 
     # Create output path with nested directories that don't exist
     nested_output = tmp_path / "level1" / "level2" / "level3" / "output.nii.gz"
@@ -120,7 +120,7 @@ def test_auto_create_output_directories(tmp_path: Path) -> None:
 
 def test_no_auto_create_directories_when_disabled(tmp_path: Path) -> None:
     """Test that directories are NOT created when create_dirs=False."""
-    make_image_cli = sitk_cli.make_cli(make_image, create_dirs=False)
+    make_image_cli = sitk_cli.create_command(make_image, create_dirs=False)
 
     # Create output path with directory that doesn't exist
     nested_output = tmp_path / "nonexistent" / "output.nii.gz"
@@ -131,14 +131,14 @@ def test_no_auto_create_directories_when_disabled(tmp_path: Path) -> None:
         make_image_cli(width=64, height=64, output=nested_output)
 
 
-def test_make_cli_batch_mode(tmp_path: Path) -> None:
-    """Test make_cli with batch=True creates a batch command."""
+def test_create_command_batch_mode(tmp_path: Path) -> None:
+    """Test create_command with batch=True creates a batch command."""
 
     def invert(input: sitk.Image) -> sitk.Image:
         return sitk.InvertIntensity(input)
 
-    # Create batch command using make_cli
-    batch_cli = sitk_cli.make_cli(invert, batch=True)
+    # Create batch command using create_command
+    batch_cli = sitk_cli.create_command(invert, batch=True)
 
     # Create test images
     input_dir = tmp_path / "inputs"
@@ -158,14 +158,14 @@ def test_make_cli_batch_mode(tmp_path: Path) -> None:
     assert (output_dir / "image_2.nii.gz").exists()
 
 
-def test_make_cli_batch_mode_with_template(tmp_path: Path) -> None:
-    """Test make_cli batch mode with custom output template."""
+def test_create_command_batch_mode_with_template(tmp_path: Path) -> None:
+    """Test create_command batch mode with custom output template."""
 
     def threshold(input: sitk.Image, *, value: int) -> sitk.Image:
         return sitk.BinaryThreshold(input, lowerThreshold=value)
 
     # Create batch command with custom template
-    batch_cli = sitk_cli.make_cli(
+    batch_cli = sitk_cli.create_command(
         threshold, batch=True, output_template="thresh_{stem}.nii.gz"
     )
 
@@ -185,8 +185,8 @@ def test_make_cli_batch_mode_with_template(tmp_path: Path) -> None:
     assert not (output_dir / "original.nii.gz").exists()
 
 
-def test_make_cli_batch_mode_transform(tmp_path: Path) -> None:
-    """Test make_cli batch mode with transforms."""
+def test_create_command_batch_mode_transform(tmp_path: Path) -> None:
+    """Test create_command batch mode with transforms."""
 
     def scale_transform(tx: sitk.Transform, *, factor: float) -> sitk.Transform:
         # Create a simple scaling transform based on input
@@ -194,7 +194,7 @@ def test_make_cli_batch_mode_transform(tmp_path: Path) -> None:
         result.SetScale([factor, factor])
         return result
 
-    batch_cli = sitk_cli.make_cli(scale_transform, batch=True)
+    batch_cli = sitk_cli.create_command(scale_transform, batch=True)
 
     # Create test transforms
     input_dir = tmp_path / "transforms"

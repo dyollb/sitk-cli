@@ -11,7 +11,12 @@ import typer  # noqa: TC002 (needed at runtime for @app.command())
 from makefun import wraps
 
 from .batch import create_batch_wrapper
-from .constants import DEFAULT_OUTPUT_ARG_NAME, FORCE_PARAM_NAME, VERBOSE_PARAM_NAME
+from .constants import (
+    DEFAULT_OUTPUT_ARG_NAME,
+    DEFAULT_OUTPUT_TEMPLATE,
+    FORCE_PARAM_NAME,
+    VERBOSE_PARAM_NAME,
+)
 from .introspection import is_typer_default
 from .parameters import build_cli_signature
 
@@ -75,9 +80,10 @@ def _save_sitk_file(
 
 def create_command(
     func: FuncType,
+    *,
     batch: bool = False,
     output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
-    output_template: str = "{stem}{suffix}",
+    output_template: str = DEFAULT_OUTPUT_TEMPLATE,
     output_stem: str | None = None,
     create_dirs: bool = True,
     verbose: bool = False,
@@ -213,13 +219,7 @@ def create_command(
 
 def make_cli(
     func: FuncType,
-    batch: bool = False,
     output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
-    output_template: str = "{stem}{suffix}",
-    output_stem: str | None = None,
-    create_dirs: bool = True,
-    verbose: bool = False,
-    overwrite: bool | Literal["prompt"] = True,
 ) -> FuncType:
     """Deprecated: Use create_command instead.
 
@@ -231,24 +231,16 @@ def make_cli(
         DeprecationWarning,
         stacklevel=2,
     )
-    return create_command(
-        func=func,
-        batch=batch,
-        output_arg_name=output_arg_name,
-        output_template=output_template,
-        output_stem=output_stem,
-        create_dirs=create_dirs,
-        verbose=verbose,
-        overwrite=overwrite,
-    )
+    return create_command(func, output_arg_name=output_arg_name)
 
 
 def register_command(
     app: typer.Typer,
     func_name: str | None = None,
+    *,
     batch: bool = False,
     output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
-    output_template: str = "{stem}{suffix}",
+    output_template: str = DEFAULT_OUTPUT_TEMPLATE,
     output_stem: str | None = None,
     create_dirs: bool = True,
     verbose: bool = False,

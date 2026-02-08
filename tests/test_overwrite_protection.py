@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import SimpleITK as sitk
 
-from sitk_cli import make_cli
+from sitk_cli import create_command
 
 
 def create_dummy_image() -> sitk.Image:
@@ -21,7 +21,7 @@ def test_overwrite_true_always_overwrites(tmp_path: Path) -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=True)
+    cli_func = create_command(create_image, overwrite=True)
 
     output_path = tmp_path / "output.nii"
 
@@ -44,7 +44,7 @@ def test_overwrite_false_raises_error(tmp_path: Path) -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=False)
+    cli_func = create_command(create_image, overwrite=False)
 
     output_path = tmp_path / "output.nii"
 
@@ -63,7 +63,7 @@ def test_overwrite_false_with_force_flag(tmp_path: Path) -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=False)
+    cli_func = create_command(create_image, overwrite=False)
 
     output_path = tmp_path / "output.nii"
 
@@ -82,7 +82,7 @@ def test_overwrite_false_force_short_flag(tmp_path: Path) -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=False)
+    cli_func = create_command(create_image, overwrite=False)
 
     output_path = tmp_path / "output.nii"
 
@@ -101,7 +101,7 @@ def test_overwrite_prompt_mode_with_force(tmp_path: Path) -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite="prompt")
+    cli_func = create_command(create_image, overwrite="prompt")
 
     output_path = tmp_path / "output.nii"
 
@@ -120,7 +120,7 @@ def test_overwrite_protection_with_transform(tmp_path: Path) -> None:
     def create_transform() -> sitk.Transform:
         return sitk.AffineTransform(2)
 
-    cli_func = make_cli(create_transform, overwrite=False)
+    cli_func = create_command(create_transform, overwrite=False)
 
     output_path = tmp_path / "transform.tfm"
 
@@ -140,7 +140,7 @@ def test_no_force_flag_when_overwrite_true() -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=True)
+    cli_func = create_command(create_image, overwrite=True)
     sig = signature(cli_func)
 
     # Check that _force parameter is not present
@@ -154,7 +154,7 @@ def test_force_flag_present_when_overwrite_false() -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite=False)
+    cli_func = create_command(create_image, overwrite=False)
     sig = signature(cli_func)
 
     # Check _force parameter is present
@@ -168,7 +168,7 @@ def test_force_flag_present_when_overwrite_prompt() -> None:
     def create_image() -> sitk.Image:
         return create_dummy_image()
 
-    cli_func = make_cli(create_image, overwrite="prompt")
+    cli_func = create_command(create_image, overwrite="prompt")
     sig = signature(cli_func)
 
     # Check _force parameter is present
