@@ -30,7 +30,7 @@ def optional_input(input1: sitk.Image, input2: sitk.Image | None = None) -> sitk
 
 def test_default_behavior_positional() -> None:
     """Test that required Image inputs become positional by default."""
-    cli = sitk_cli.make_cli(process_image)
+    cli = sitk_cli.create_command(process_image)
     sig = signature(cli)
 
     # Input should be ArgumentInfo (positional), not OptionInfo
@@ -47,7 +47,7 @@ def test_all_keyword_only_makes_output_named() -> None:
     def all_keyword_only(*, input: sitk.Image, threshold: float = 0.5) -> sitk.Image:
         return input > threshold
 
-    cli = sitk_cli.make_cli(all_keyword_only)
+    cli = sitk_cli.create_command(all_keyword_only)
     sig = signature(cli)
 
     # Input is keyword-only (after *,)
@@ -60,7 +60,7 @@ def test_all_keyword_only_makes_output_named() -> None:
 
 def test_multiple_positional_inputs() -> None:
     """Test that multiple required inputs are all positional."""
-    cli = sitk_cli.make_cli(two_inputs)
+    cli = sitk_cli.create_command(two_inputs)
     sig = signature(cli)
 
     # Both inputs should be positional
@@ -72,7 +72,7 @@ def test_multiple_positional_inputs() -> None:
 
 def test_optional_input_remains_named() -> None:
     """Test that optional Image inputs remain named."""
-    cli = sitk_cli.make_cli(optional_input)
+    cli = sitk_cli.create_command(optional_input)
     sig = signature(cli)
 
     # First input is required, should be positional
@@ -85,7 +85,7 @@ def test_optional_input_remains_named() -> None:
 
 def test_keyword_only_parameter() -> None:
     """Test that keyword-only parameters (after *,) are always named."""
-    cli = sitk_cli.make_cli(two_inputs_keyword_only)
+    cli = sitk_cli.create_command(two_inputs_keyword_only)
     sig = signature(cli)
 
     # input1 is positional (before *,)
@@ -102,7 +102,7 @@ def test_all_keyword_only_parameters() -> None:
     def all_keyword_only(*, input1: sitk.Image, input2: sitk.Image) -> sitk.Image:
         return input1 + input2
 
-    cli = sitk_cli.make_cli(all_keyword_only)
+    cli = sitk_cli.create_command(all_keyword_only)
     sig = signature(cli)
 
     # Both inputs are keyword-only (after *,)
@@ -119,7 +119,7 @@ def test_no_inputs_makes_output_positional() -> None:
         """Create an image from scratch."""
         return sitk.Image()
 
-    cli = sitk_cli.make_cli(create_image)
+    cli = sitk_cli.create_command(create_image)
     sig = signature(cli)
 
     # Only parameter should be output, and it should be positional
@@ -135,7 +135,7 @@ def test_no_inputs_with_regular_params() -> None:
         """Create an image with specified dimensions."""
         return sitk.Image([width, height], sitk.sitkUInt8)
 
-    cli = sitk_cli.make_cli(create_image)
+    cli = sitk_cli.create_command(create_image)
     sig = signature(cli)
 
     # Should have width, height, and output parameters

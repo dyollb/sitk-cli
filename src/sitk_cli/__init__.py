@@ -2,7 +2,7 @@ import logging
 import sys
 from typing import Final
 
-from .lib import make_cli, register_command
+from .lib import create_command, make_cli, register_command
 
 # Try to use Rich if available, otherwise fall back to standard logging
 try:
@@ -24,5 +24,11 @@ logger.setLevel(logging.WARNING)  # Default: quiet
 logger.addHandler(_handler)
 logger.propagate = False  # Don't propagate to root logger
 
-__version__: Final = "0.8.0"
-__all__ = ("__version__", "logger", "make_cli", "register_command")
+__version__: Final = "0.8.1"
+__all__ = (
+    "__version__",
+    "create_command",
+    "logger",
+    "make_cli",  # Deprecated alias
+    "register_command",
+)

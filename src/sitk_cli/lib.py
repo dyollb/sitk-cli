@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
-from inspect import Parameter, isclass, signature
 from pathlib import Path
-from typing import Any, Literal, TypeAlias, get_args, get_origin
+from typing import Any, Literal, TypeAlias
 
 import SimpleITK as sitk
-import typer
+import typer  # noqa: TC002 (needed at runtime for @app.command())
 from makefun import wraps
+
+from .batch import create_batch_wrapper
+from .constants import (
+    DEFAULT_OUTPUT_ARG_NAME,
+    DEFAULT_OUTPUT_TEMPLATE,
+    FORCE_PARAM_NAME,
+    VERBOSE_PARAM_NAME,
+)
+from .introspection import is_typer_default
+from .parameters import build_cli_signature
 
 # Type aliases
 SitkImageOrTransform: TypeAlias = type[sitk.Image] | type[sitk.Transform]
@@ -16,29 +26,93 @@ FuncType: TypeAlias = Callable[..., Any]
 DecoratorType: TypeAlias = Callable[[FuncType], FuncType]
 
 
-def make_cli(
+def _load_sitk_file(
+    file_path: Path, param_type: SitkImageOrTransform
+) -> sitk.Image | sitk.Transform:
+    """Load SimpleITK Image or Transform from file.
+
+    Raises FileNotFoundError if file doesn't exist.
+    """
+    if not file_path.exists():
+        type_name = "image" if param_type is sitk.Image else "transform"
+        msg = f"Input {type_name} file not found: {file_path}"
+        raise FileNotFoundError(msg)
+
+    if param_type is sitk.Image:
+        return sitk.ReadImage(str(file_path))
+    return sitk.ReadTransform(str(file_path))
+
+
+def _save_sitk_file(
+    obj: sitk.Image | sitk.Transform,
+    output_file: Path,
+    *,
+    overwrite: bool | Literal["prompt"],
+    force: bool,
+    create_dirs: bool,
+) -> None:
+    """Save SimpleITK Image or Transform to file.
+
+    Raises FileExistsError if file exists and overwrite protection enabled.
+    """
+    # Check for overwrite protection
+    if overwrite is not True and not force and output_file.exists():
+        if overwrite == "prompt":
+            # Interactive prompt
+            response = input(f"Output file '{output_file}' exists. Overwrite? [y/N]: ")
+            if response.lower() not in ("y", "yes"):
+                print("Operation cancelled.")
+                return
+        else:  # overwrite is False
+            msg = (
+                f"Output file '{output_file}' already exists. Use --force to overwrite."
+            )
+            raise FileExistsError(msg)
+
+    if create_dirs:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(obj, sitk.Image):
+        sitk.WriteImage(obj, str(output_file))
+    else:
+        sitk.WriteTransform(obj, str(output_file))
+
+
+def create_command(
     func: FuncType,
-    output_arg_name: str = "output",
+    *,
+    batch: bool = False,
+    output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
+    output_template: str = DEFAULT_OUTPUT_TEMPLATE,
+    output_stem: str | None = None,
     create_dirs: bool = True,
     verbose: bool = False,
     overwrite: bool | Literal["prompt"] = True,
-    globals: dict[str, Any] | None = None,
-    locals: dict[str, Any] | None = None,
 ) -> FuncType:
-    """Make command line interface from function with sitk.Image args.
+    """Create command line interface from function with sitk.Image args.
 
     Transforms a function that uses SimpleITK Image/Transform objects into a CLI
     that accepts file paths. Automatically handles loading from and saving to files.
 
-    Behavior:
+    Single-file behavior:
         - Required Image/Transform parameters → positional arguments
         - Keyword-only Image/Transform parameters (after *,) → named options
         - Optional Image/Transform parameters (with defaults) → named options
         - Output → positional if ANY input is positional, otherwise named
 
+    Batch mode behavior (batch=True):
+        - Image/Transform parameters accept directories or files
+        - Directories are globbed and matched by filename stem
+        - Single files are reused across all matches
+        - Adds output_dir and output_template parameters
+
     Args:
         func: Function to wrap with CLI functionality
-        output_arg_name: Name for the output file parameter (default: "output")
+        batch: Enable batch processing mode (default: False)
+        output_arg_name: Name for output file parameter in single-file mode (default: "output")
+        output_template: Template for output filenames in batch mode (default: "{stem}{suffix}")
+            Variables: {stem}, {suffix}, {name}
+        output_stem: Which parameter drives output naming in batch mode (default: first Image/Transform param)
         create_dirs: Auto-create parent directories for output files (default: True)
         verbose: Add --verbose/-v flag for logging control (default: False)
         overwrite: Control output file overwrite behavior (default: True)
@@ -56,164 +130,41 @@ def make_cli(
         ValueError: If annotation parsing fails
 
     Examples:
+        Single-file mode:
         >>> def process(input: sitk.Image) -> sitk.Image:
         ...     return input
+        >>> cli = create_command(process)
         # CLI: process INPUT OUTPUT
 
-        >>> def process(*, input: sitk.Image) -> sitk.Image:
-        ...     return input
-        # CLI: process --input INPUT --output OUTPUT
+        Batch mode:
+        >>> cli_batch = create_command(process, batch=True)
+        # CLI: process INPUT_DIR/ OUTPUT_DIR/
 
         >>> def process(input: sitk.Image, *, mask: sitk.Image) -> sitk.Image:
         ...     return input * mask
+        >>> cli = create_command(process)
         # CLI: process INPUT OUTPUT --mask MASK
     """
-    image_args: list[str] = []
-    transform_args: list[str] = []
-    has_positional_input = (
-        False  # Track if we see any positional Image/Transform inputs
+    # Build CLI signature using parameters module
+    sig_info = build_cli_signature(
+        func=func,
+        output_arg_name=output_arg_name,
+        verbose=verbose,
+        overwrite=overwrite,
     )
-    has_any_image_transform_input = (
-        False  # Track if we see any Image/Transform inputs at all
-    )
 
-    def _parse_annotation(annotation: Any) -> Any:
-        """Parse type annotation, handling Optional/Union and string annotations.
+    # Extract info from signature
+    image_transform_params = sig_info.image_transform_params
+    optional_params = sig_info.optional_params
+    image_args = sig_info.image_args
+    transform_args = sig_info.transform_args
 
-        String annotations need evaluation to convert to actual types. This is
-        necessary when annotations reference types not yet defined at parse time.
-        """
-        if isinstance(annotation, str):
-            try:
-                annotation = eval(annotation, globals, locals)
-            except Exception as e:
-                msg = f"Failed to parse type annotation '{annotation}': {e}"
-                raise ValueError(msg) from e
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-        if origin is not None:
-            for a in args:
-                if a is not type(None):
-                    return a
-        return annotation
-
-    def _translate_param(p: Parameter) -> Parameter:
-        """Translate function parameters for CLI compatibility.
-
-        Converts SimpleITK Image/Transform parameters to Path parameters,
-        tracks which parameters need file I/O, and sets appropriate defaults.
-        Uses Typer convention: Argument() for positional, Option() for named.
-        Respects Python's keyword-only parameters (after *,).
-        """
-        nonlocal has_positional_input, has_any_image_transform_input
-        annotation = _parse_annotation(p.annotation)
-        default = p.default
-        is_keyword_only = p.kind == Parameter.KEYWORD_ONLY
-
-        if isclass(annotation) and issubclass(annotation, (sitk.Image, sitk.Transform)):
-            has_any_image_transform_input = True
-            if issubclass(annotation, sitk.Image):
-                image_args.append(p.name)
-            else:
-                transform_args.append(p.name)
-            annotation = Path
-
-            # Determine if this should be positional or named
-            if is_keyword_only:
-                # Keyword-only parameter (after *, in signature) is always named
-                default = typer.Option(None) if p.default is None else typer.Option(...)
-            elif p.default is Parameter.empty:
-                # Positional: required Image/Transform without default
-                default = typer.Argument(...)
-                has_positional_input = True  # Mark that we've seen a positional input
-            elif p.default is None:
-                # Named: optional Image/Transform (has default)
-                default = typer.Option(None)
-            else:
-                # Named: Image/Transform with non-None default
-                default = typer.Option(...)
-        elif p.default == Parameter.empty:
-            # Non-Image/Transform required parameters stay as named options
-            default = typer.Option(...)
-        return Parameter(
-            p.name,
-            Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=annotation,
-            default=default,
-        )
-
-    func_sig = signature(func)
-
-    params: list[Parameter] = []
-    for p in func_sig.parameters.values():
-        params.append(_translate_param(p))
-
-    return_type = _parse_annotation(func_sig.return_annotation)
-    if (
-        return_type
-        and isclass(return_type)
-        and issubclass(return_type, (sitk.Image, sitk.Transform))
-    ):
-        # Output is positional if:
-        # 1. There's at least one positional Image/Transform input, OR
-        # 2. There are no Image/Transform inputs at all (e.g., generator functions)
-        # Output is named only when ALL Image/Transform inputs are keyword-only
-        output_default = (
-            typer.Argument(...)
-            if (has_positional_input or not has_any_image_transform_input)
-            else None
-        )
-        params.append(
-            Parameter(
-                output_arg_name,
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=output_default,
-                annotation=Path,
-            ),
-        )
-        return_type = None
-
-    # Add verbose parameter if requested
-    if verbose:
-        params.append(
-            Parameter(
-                "_verbose",
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=typer.Option(
-                    0,
-                    "--verbose",
-                    "-v",
-                    count=True,
-                    help="Increase verbosity (-v for INFO, -vv for DEBUG)",
-                ),
-                annotation=int,
-            )
-        )
-
-    # Add force flag if overwrite protection is enabled
-    if overwrite is not True:
-        params.append(
-            Parameter(
-                "_force",
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=typer.Option(
-                    False,
-                    "--force",
-                    "-f",
-                    help="Force overwrite of existing output files",
-                ),
-                annotation=bool,
-            )
-        )
-
-    new_sig = func_sig.replace(parameters=params, return_annotation=return_type)
-
-    @wraps(func, new_sig=new_sig)  # type: ignore[misc,untyped-decorator]
+    # Create single-file wrapper
+    @wraps(func, new_sig=sig_info.signature)  # type: ignore[misc,untyped-decorator]
     def func_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Configure logging based on verbosity level
-        if verbose and "_verbose" in kwargs:
-            verbose_level = kwargs.pop("_verbose")
+        if verbose and VERBOSE_PARAM_NAME in kwargs:
+            verbose_level = kwargs.pop(VERBOSE_PARAM_NAME)
             logger = logging.getLogger("sitk_cli")
             if verbose_level == 1:
                 logger.setLevel(logging.INFO)
@@ -227,91 +178,107 @@ def make_cli(
             if k == output_arg_name:
                 output_file = v
                 continue
-            if k == "_force":
-                # Extract boolean value from typer.Option if needed
-                force = bool(v.default if isinstance(v, typer.models.OptionInfo) else v)
+            if k == FORCE_PARAM_NAME:
+                force = bool(v.default if is_typer_default(v) else v)
                 continue
             if k in image_args and isinstance(v, Path):
-                if not v.exists():
-                    msg = f"Input image file not found: {v}"
-                    raise FileNotFoundError(msg)
-                v = sitk.ReadImage(str(v))
-            if k in transform_args and isinstance(v, Path):
-                if not v.exists():
-                    msg = f"Input transform file not found: {v}"
-                    raise FileNotFoundError(msg)
-                v = sitk.ReadTransform(str(v))
+                v = _load_sitk_file(v, sitk.Image)
+            elif k in transform_args and isinstance(v, Path):
+                v = _load_sitk_file(v, sitk.Transform)
             kwargs_inner[k] = v
 
         ret = func(*args, **kwargs_inner)
         if output_file and ret:
-            # Check for overwrite protection
-            if overwrite is not True and not force and output_file.exists():
-                if overwrite == "prompt":
-                    # Interactive prompt
-                    response = input(
-                        f"Output file '{output_file}' exists. Overwrite? [y/N]: "
-                    )
-                    if response.lower() not in ("y", "yes"):
-                        print("Operation cancelled.")
-                        return None
-                else:  # overwrite is False
-                    msg = (
-                        f"Output file '{output_file}' already exists. "
-                        "Use --force to overwrite."
-                    )
-                    raise FileExistsError(msg)
-
-            if create_dirs:
-                output_file.parent.mkdir(parents=True, exist_ok=True)
-            if isinstance(ret, sitk.Image):
-                return sitk.WriteImage(ret, str(output_file))
-            return sitk.WriteTransform(ret, str(output_file))
+            _save_sitk_file(
+                ret,
+                output_file,
+                overwrite=overwrite,
+                force=force,
+                create_dirs=create_dirs,
+            )
         return ret
 
+    # If batch mode, wrap with batch processing logic
+    if batch:
+        return create_batch_wrapper(
+            func=func,
+            func_wrapper=func_wrapper,
+            positional_params=sig_info.positional_params,
+            keyword_only_params=sig_info.keyword_only_params,
+            output_param=sig_info.output_param,
+            image_transform_params=image_transform_params,
+            optional_params=optional_params,
+            output_arg_name=output_arg_name,
+            output_template=output_template,
+            output_stem=output_stem,
+            all_params=list(sig_info.signature.parameters.values()),
+        )
+
     return func_wrapper
+
+
+def make_cli(
+    func: FuncType,
+    output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
+) -> FuncType:
+    """Deprecated: Use create_command instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use create_command() instead.
+    """
+    warnings.warn(
+        "make_cli() is deprecated, use create_command() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return create_command(func, output_arg_name=output_arg_name)
 
 
 def register_command(
     app: typer.Typer,
     func_name: str | None = None,
-    output_arg_name: str = "output",
+    *,
+    batch: bool = False,
+    output_arg_name: str = DEFAULT_OUTPUT_ARG_NAME,
+    output_template: str = DEFAULT_OUTPUT_TEMPLATE,
+    output_stem: str | None = None,
     create_dirs: bool = True,
     verbose: bool = False,
     overwrite: bool | Literal["prompt"] = True,
-    globals: dict[str, Any] | None = None,
-    locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
     """Register a function as a Typer command.
 
-    Decorator that wraps a function with make_cli and registers it with a Typer app.
+    Decorator that wraps a function with create_command and registers it with a Typer app.
 
     Args:
         app: Typer application instance to register the command with
         func_name: Custom name for the command (default: use function name)
-        output_arg_name: Name for the output file parameter (default: "output")
+        batch: Enable batch processing mode (default: False)
+        output_arg_name: Name for output file parameter in single-file mode (default: "output")
+        output_template: Template for output filenames in batch mode (default: "{stem}{suffix}")
+        output_stem: Which parameter drives output naming in batch mode (default: first Image/Transform param)
         create_dirs: Auto-create parent directories for output files (default: True)
         verbose: Add --verbose/-v flag for logging control (default: False)
         overwrite: Control output file overwrite behavior (default: True)
             - True: Always overwrite existing files
             - False: Error if output file exists (adds --force flag to override)
             - "prompt": Ask user interactively (adds --force flag to skip prompt)
-        globals: Global namespace for evaluating string annotations
-        locals: Local namespace for evaluating string annotations
 
     Returns:
         Decorator function that registers and returns the original function
 
     Examples:
+        Single-file mode:
         >>> @register_command(app)
         ... def process(input: sitk.Image) -> sitk.Image:
         ...     return input
         # CLI: process INPUT OUTPUT
 
-        >>> @register_command(app)
-        ... def process(*, input: sitk.Image) -> sitk.Image:
+        Batch mode:
+        >>> @register_command(app, batch=True)
+        ... def process(input: sitk.Image) -> sitk.Image:
         ...     return input
-        # CLI: process --input INPUT --output OUTPUT
+        # CLI: process INPUT_DIR/ OUTPUT_DIR/
 
         >>> @register_command(app)
         ... def process(input: sitk.Image, *, mask: sitk.Image) -> sitk.Image:
@@ -320,14 +287,15 @@ def register_command(
     """
 
     def decorator(func: FuncType) -> FuncType:
-        func_cli = make_cli(
+        func_cli = create_command(
             func,
+            batch=batch,
             output_arg_name=output_arg_name,
+            output_template=output_template,
+            output_stem=output_stem,
             create_dirs=create_dirs,
             verbose=verbose,
             overwrite=overwrite,
-            globals=globals,
-            locals=locals,
         )
 
         @app.command()
