@@ -8,7 +8,6 @@ from __future__ import annotations
 from inspect import Parameter, Signature
 from typing import List, Optional, Union  # noqa: UP035
 
-import pytest
 import SimpleITK as sitk
 
 from sitk_cli.introspection import (
@@ -21,15 +20,19 @@ from sitk_cli.introspection import (
 class TestParseAnnotation:
     """Test parse_annotation with edge cases."""
 
-    def test_string_annotation_invalid_syntax(self) -> None:
-        """Test that invalid string annotations raise ValueError."""
-        with pytest.raises(ValueError, match="Failed to parse type annotation"):
-            parse_annotation("NonExistentType[Invalid")
+    def test_string_annotation_returned_as_is(self) -> None:
+        """Test that string annotations are returned unchanged.
 
-    def test_string_annotation_undefined_name(self) -> None:
-        """Test that undefined names in string annotations raise ValueError."""
-        with pytest.raises(ValueError, match="Failed to parse type annotation"):
-            parse_annotation("UndefinedClassName")
+        String annotations should be resolved by get_type_hints() before
+        calling parse_annotation(). This function just returns them as-is.
+        """
+        result = parse_annotation("SomeType")
+        assert result == "SomeType"
+
+    def test_complex_string_annotation_returned_as_is(self) -> None:
+        """Test that complex string annotations are returned unchanged."""
+        result = parse_annotation("List[Image]")
+        assert result == "List[Image]"
 
     def test_union_extracts_non_none_type(self) -> None:
         """Test that Union types extract the non-None type correctly."""

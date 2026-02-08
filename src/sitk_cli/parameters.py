@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from inspect import Parameter, Signature, signature
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import SimpleITK as sitk
 import typer
@@ -127,8 +127,6 @@ def build_cli_signature(
     output_arg_name: str,
     verbose: bool,
     overwrite: bool | str,
-    globals: dict[str, Any] | None,
-    locals: dict[str, Any] | None,
 ) -> CLISignatureInfo:
     """Build CLI signature from function signature.
 
@@ -176,7 +174,9 @@ def build_cli_signature(
                 has_positional_input = True
         elif param.default == Parameter.empty:
             # Non-Image/Transform required parameters stay as named options
-            annotation = parse_annotation(param.annotation, globals, locals)
+            # Get resolved annotation from type_hints if available, otherwise use raw
+            annotation = type_hints.get(param.name, param.annotation)
+            annotation = parse_annotation(annotation)
             new_param = Parameter(
                 param.name,
                 param.kind,
@@ -190,7 +190,9 @@ def build_cli_signature(
                 has_any_positional_or_keyword = True
         else:
             # Keep other parameters as-is
-            annotation = parse_annotation(param.annotation, globals, locals)
+            # Get resolved annotation from type_hints if available, otherwise use raw
+            annotation = type_hints.get(param.name, param.annotation)
+            annotation = parse_annotation(annotation)
             new_param = Parameter(
                 param.name,
                 param.kind,
@@ -204,7 +206,9 @@ def build_cli_signature(
                 has_any_positional_or_keyword = True
 
     # Determine output parameter
-    return_type = parse_annotation(func_sig.return_annotation, globals, locals)
+    # Get resolved return annotation from type_hints
+    return_annotation = type_hints.get("return", func_sig.return_annotation)
+    return_type = parse_annotation(return_annotation)
     output_param: Parameter | None = None
     if (
         return_type

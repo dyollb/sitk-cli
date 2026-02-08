@@ -82,8 +82,6 @@ def create_command(
     create_dirs: bool = True,
     verbose: bool = False,
     overwrite: bool | Literal["prompt"] = True,
-    globals: dict[str, Any] | None = None,
-    locals: dict[str, Any] | None = None,
 ) -> FuncType:
     """Create command line interface from function with sitk.Image args.
 
@@ -147,8 +145,6 @@ def create_command(
         output_arg_name=output_arg_name,
         verbose=verbose,
         overwrite=overwrite,
-        globals=globals,
-        locals=locals,
     )
 
     # Extract info from signature
@@ -224,8 +220,6 @@ def make_cli(
     create_dirs: bool = True,
     verbose: bool = False,
     overwrite: bool | Literal["prompt"] = True,
-    globals: dict[str, Any] | None = None,
-    locals: dict[str, Any] | None = None,
 ) -> FuncType:
     """Deprecated: Use create_command instead.
 
@@ -246,8 +240,6 @@ def make_cli(
         create_dirs=create_dirs,
         verbose=verbose,
         overwrite=overwrite,
-        globals=globals,
-        locals=locals,
     )
 
 
@@ -261,8 +253,6 @@ def register_command(
     create_dirs: bool = True,
     verbose: bool = False,
     overwrite: bool | Literal["prompt"] = True,
-    globals: dict[str, Any] | None = None,
-    locals: dict[str, Any] | None = None,
 ) -> DecoratorType:
     """Register a function as a Typer command.
 
@@ -281,8 +271,6 @@ def register_command(
             - True: Always overwrite existing files
             - False: Error if output file exists (adds --force flag to override)
             - "prompt": Ask user interactively (adds --force flag to skip prompt)
-        globals: Global namespace for evaluating string annotations
-        locals: Local namespace for evaluating string annotations
 
     Returns:
         Decorator function that registers and returns the original function
@@ -316,8 +304,6 @@ def register_command(
             create_dirs=create_dirs,
             verbose=verbose,
             overwrite=overwrite,
-            globals=globals,
-            locals=locals,
         )
 
         @app.command()

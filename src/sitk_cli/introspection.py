@@ -26,30 +26,23 @@ def resolve_type_hints(func: Any) -> dict[str, Any]:
     return get_type_hints(func)
 
 
-def parse_annotation(
-    annotation: Any,
-    globals_dict: dict[str, Any] | None = None,
-    locals_dict: dict[str, Any] | None = None,
-) -> Any:
-    """Parse type annotation, handling string annotations and Optional/Union types.
+def parse_annotation(annotation: Any) -> Any:
+    """Parse type annotation, handling Optional/Union types.
+
+    Note: String annotations should be resolved via get_type_hints() before
+    calling this function. This function only extracts non-None types from
+    Union/Optional annotations.
 
     Args:
-        annotation: Type annotation to parse
-        globals_dict: Global namespace for evaluating string annotations
-        locals_dict: Local namespace for evaluating string annotations
+        annotation: Type annotation to parse (should already be resolved)
 
     Returns:
         Resolved type annotation (non-None type extracted from Union)
-
-    Raises:
-        ValueError: If string annotation evaluation fails
     """
+    # String annotations should have been resolved by get_type_hints already
+    # If we encounter one, just return it as-is
     if isinstance(annotation, str):
-        try:
-            annotation = eval(annotation, globals_dict, locals_dict)
-        except Exception as e:
-            msg = f"Failed to parse type annotation '{annotation}': {e}"
-            raise ValueError(msg) from e
+        return annotation
 
     origin = get_origin(annotation)
     args = get_args(annotation)

@@ -16,9 +16,7 @@ class Mode(StrEnum):
 app = typer.Typer()
 
 
-@register_command(
-    app, func_name="centered-transform-initializer", locals=locals(), globals=globals()
-)
+@register_command(app, func_name="centered-transform-initializer")
 def example_function(
     fixed: sitk.Image,
     moving: sitk.Image,
