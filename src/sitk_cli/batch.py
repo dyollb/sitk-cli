@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from inspect import Parameter, signature
 from pathlib import Path
@@ -18,6 +19,8 @@ from .constants import (
     VERBOSE_PARAM_NAME,
 )
 from .introspection import is_typer_default
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .lib import FuncType
@@ -178,7 +181,7 @@ def create_batch_wrapper(
                 glob_pattern = get_default_glob(ptype)
                 files = sorted(path.glob(glob_pattern))
                 if not files:
-                    print(f"Warning: No files found matching {path}/{glob_pattern}")
+                    _logger.warning("No files found matching %s/%s", path, glob_pattern)
                     return
                 dir_files[pname] = files
             else:
@@ -202,10 +205,8 @@ def create_batch_wrapper(
             }
 
             if not complete_matches:
-                print("Error: No matching files found")
-                raise typer.Exit(code=1)
-        else:
-            complete_matches = {"single": {}}
+                msg = "No matching files found across all input directories"
+                raise FileNotFoundError(msg)
 
         # Create output dir if needed
         if has_output and out_dir:
@@ -225,7 +226,7 @@ def create_batch_wrapper(
                 out_name = template.format(stem=stem, suffix=suffix, name=ref_file.name)
                 out_path = out_dir / out_name
 
-            print(f"[{idx}/{total}] Processing {stem}...")
+            _logger.info("[%d/%d] Processing %s...", idx, total, stem)
 
             # Call single-file wrapper with individual file paths
             call_kwargs = {**kwargs}  # Other params (radius, etc.)
@@ -236,8 +237,8 @@ def create_batch_wrapper(
             func_wrapper(**call_kwargs)
 
             if out_path:
-                print(f"  → Saved to {out_path.name}")
+                _logger.info("  → Saved to %s", out_path.name)
 
-        print(f"\nCompleted {total} files")
+        _logger.info("Completed %d files", total)
 
     return batch_wrapper
