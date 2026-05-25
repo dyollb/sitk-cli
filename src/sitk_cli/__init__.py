@@ -3,6 +3,7 @@ import sys
 from typing import Final
 
 from .lib import make_cli, register_command
+from .progress import progress_bar, progress_tracker
 
 # Try to use Rich if available, otherwise fall back to standard logging
 try:
@@ -25,4 +26,11 @@ logger.addHandler(_handler)
 logger.propagate = False  # Don't propagate to root logger
 
 __version__: Final = "0.8.0"
-__all__ = ("__version__", "logger", "make_cli", "register_command")
+__all__ = (
+    "__version__",
+    "logger",
+    "make_cli",
+    "progress_bar",
+    "progress_tracker",
+    "register_command",
+)
