@@ -16,6 +16,7 @@ Create [Typer](https://github.com/tiangolo/typer) command line interfaces from f
 - 🚀 Built on Typer for modern CLI experiences
 - 🐍 Pythonic CLI design using native `*,` syntax for keyword-only parameters
 - 📁 Auto-create output directories with optional overwrite protection
+- 📊 Progress bars for long-running operations via Rich integration
 - 📝 Optional verbose logging with Rich integration
 - 🐍 Python 3.11+ with modern syntax
 
@@ -107,6 +108,44 @@ def process_with_logging(input: sitk.Image) -> sitk.Image:
 ```sh
 python script.py process-with-logging input.nii output.nii -v   # INFO level
 python script.py process-with-logging input.nii output.nii -vv  # DEBUG level
+```
+
+### Progress Feedback
+
+Long-running operations can report progress via Rich progress bars. Both utilities
+are no-ops when verbose mode is off or Rich is not installed.
+
+**Observer-based** (SimpleITK filters/registration methods):
+
+```python
+from sitk_cli import progress_tracker, register_command
+
+@register_command(app, verbose=True)
+def register_images(fixed: sitk.Image, moving: sitk.Image) -> sitk.Transform:
+    registration = sitk.ImageRegistrationMethod()
+    with progress_tracker(registration, desc="Registering"):
+        return registration.Execute(fixed, moving)
+```
+
+**Manual** (custom loops):
+
+```python
+from sitk_cli import logger, progress_bar, register_command
+
+@register_command(app, verbose=True)
+def process_slices(input: sitk.Image) -> sitk.Image:
+    size = input.GetSize()
+    result = sitk.Image(input)
+    with progress_bar(total=size[2], desc="Processing slices") as pbar:
+        for k in range(size[2]):
+            result[:, :, k] = sitk.Median(input[:, :, k], [2, 2])
+            pbar.update(1)
+    return result
+```
+
+```sh
+python script.py process-slices input.nii output.nii -v  # shows progress bar
+python script.py process-slices input.nii output.nii     # silent
 ```
 
 ### Overwrite Protection
